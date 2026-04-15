@@ -721,6 +721,157 @@ html.dark .sbg-variant-green {
   -webkit-text-fill-color: transparent;
 }
 
+/* ==================== Homepage Header Contrast Optimization ==================== */
+.homepage-header {
+  background: rgba(10, 12, 20, 0.56) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24);
+}
+
+.homepage-header,
+.homepage-header a,
+.homepage-header .semi-typography,
+.homepage-header nav a,
+.homepage-header .semi-button,
+.homepage-header .semi-button .semi-icon,
+.homepage-header .semi-tag-content {
+  color: rgba(255, 255, 255, 0.96) !important;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.85),
+    0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+.homepage-header nav a:hover {
+  color: #ffffff !important;
+}
+
+.homepage-header .semi-button.semi-button-borderless.semi-button-tertiary {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.homepage-header .semi-button.semi-button-borderless.semi-button-tertiary:hover,
+.homepage-header .semi-button.semi-button-borderless.semi-button-tertiary:focus {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+
+.homepage-header img {
+  filter:
+    drop-shadow(0 2px 8px rgba(0, 0, 0, 0.65))
+    drop-shadow(0 0 10px rgba(0, 0, 0, 0.35));
+}
+
+/* ==================== Homepage Banner Contrast Optimization ==================== */
+/* 
+ * The blackhole background is always dark, so we need to ensure text is always 
+ * light-colored for proper contrast, regardless of theme mode.
+ * 
+ * WCAG AA Requirements:
+ * - Normal text (< 18pt): 4.5:1 contrast ratio
+ * - Large text (≥ 18pt or ≥ 14pt bold): 3:1 contrast ratio
+ */
+
+/* Force light text colors on dark blackhole background */
+.homepage-banner-content {
+  /* Primary text: Pure white for maximum contrast (21:1 on black) */
+  --banner-text-primary: #ffffff;
+  /* Secondary text: 90% opacity white (18.9:1 on black) */
+  --banner-text-secondary: rgba(255, 255, 255, 0.90);
+  /* Tertiary text: 80% opacity white (16.8:1 on black) */
+  --banner-text-tertiary: rgba(255, 255, 255, 0.80);
+}
+
+/* Override Semi Design text colors for banner section - Primary heading */
+.homepage-banner-content .text-semi-color-text-0 {
+  color: var(--banner-text-primary) !important;
+}
+
+/* Override Semi Design text colors for banner section - Secondary text */
+.homepage-banner-content .text-semi-color-text-1 {
+  color: var(--banner-text-secondary) !important;
+}
+
+/* Override Semi Design text colors for banner section - Tertiary text */
+.homepage-banner-content .text-semi-color-text-2 {
+  color: var(--banner-text-tertiary) !important;
+}
+
+/* Enhance text shadow for better readability on complex backgrounds */
+.homepage-banner-content h1,
+.homepage-banner-content p {
+  text-shadow: 
+    0 3px 12px rgba(0, 0, 0, 0.95),
+    0 1px 4px rgba(0, 0, 0, 0.9),
+    0 0 24px rgba(0, 0, 0, 0.45);
+}
+
+.homepage-hero-title {
+  color: #fffdf6 !important;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.38));
+}
+
+.homepage-hero-title .shine-text {
+  background: linear-gradient(
+    180deg,
+    #fffefb 0%,
+    #fff5dd 34%,
+    #ffe3b5 62%,
+    #fffef8 100%
+  );
+  background-size: 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.82),
+    0 0 18px rgba(255, 214, 145, 0.24);
+}
+
+.homepage-hero-subtitle {
+  color: rgba(255, 249, 237, 0.98) !important;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.88),
+    0 0 16px rgba(255, 219, 158, 0.14);
+}
+
+.homepage-hero-description {
+  color: rgba(255, 244, 224, 0.88) !important;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.84),
+    0 0 14px rgba(255, 216, 150, 0.12);
+}
+
+/* Ensure provider section heading has proper contrast */
+.homepage-banner-content .semi-typography-tertiary {
+  color: var(--banner-text-tertiary) !important;
+}
+
+.homepage-hero-vendors-title {
+  color: rgba(255, 247, 232, 0.94) !important;
+  text-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.88),
+    0 0 16px rgba(255, 215, 145, 0.16);
+}
+
+/* Keep icon colors unchanged while increasing separation from the dark background */
+.homepage-banner-content svg,
+.homepage-banner-content .semi-button .semi-icon,
+.homepage-banner-content .semi-input .semi-input-suffix {
+  filter:
+    drop-shadow(0 2px 6px rgba(0, 0, 0, 0.9))
+    drop-shadow(0 0 10px rgba(0, 0, 0, 0.55));
+}
+
+/* Ensure numeric/logo text remains readable over the animated background */
+.homepage-banner-content .semi-typography,
+.homepage-banner-content .shine-text {
+  text-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.95),
+    0 1px 4px rgba(0, 0, 0, 0.9),
+    0 0 24px rgba(0, 0, 0, 0.45);
+}
+
 /* ==================== ScrollList 定制样式 ==================== */
 .semi-scrolllist,
 .semi-scrolllist * {

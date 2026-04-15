@@ -27,7 +27,6 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
       console: true,
       pricing: true,
       docs: true,
-      about: true,
     };
 
     // 使用传入的配置或默认配置
@@ -48,11 +47,6 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         text: t('模型广场'),
         itemKey: 'pricing',
         to: '/pricing',
-      },
-      {
-        text: t('关于'),
-        itemKey: 'about',
-        to: '/about',
       },
     ];
 

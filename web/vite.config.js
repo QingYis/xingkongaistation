@@ -22,6 +22,7 @@ import { defineConfig, transformWithEsbuild } from 'vite';
 import pkg from '@douyinfe/vite-plugin-semi';
 import path from 'path';
 import { codeInspectorPlugin } from 'code-inspector-plugin';
+import glsl from 'vite-plugin-glsl';
 const { vitePluginSemi } = pkg;
 
 // https://vitejs.dev/config/
@@ -35,6 +36,8 @@ export default defineConfig({
     codeInspectorPlugin({
       bundler: 'vite',
     }),
+    react(),
+    glsl(),
     {
       name: 'treat-js-files-as-jsx',
       async transform(code, id) {
@@ -50,7 +53,6 @@ export default defineConfig({
         });
       },
     },
-    react(),
     vitePluginSemi({
       cssLayer: true,
     }),

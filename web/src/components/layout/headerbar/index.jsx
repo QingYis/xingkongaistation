@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useHeaderBar } from '../../../hooks/common/useHeaderBar';
 import { useNotifications } from '../../../hooks/common/useNotifications';
 import { useNavigation } from '../../../hooks/common/useNavigation';
@@ -28,6 +29,8 @@ import Navigation from './Navigation';
 import ActionButtons from './ActionButtons';
 
 const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
+  const location = useLocation();
+  const isHomeRoute = location.pathname === '/';
   const {
     userState,
     statusState,
@@ -43,12 +46,10 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
     docsLink,
     isDemoSiteMode,
     isConsoleRoute,
-    theme,
     headerNavModules,
     pricingRequireAuth,
     logout,
     handleLanguageChange,
-    handleThemeToggle,
     handleMobileMenuToggle,
     navigate,
     t,
@@ -65,7 +66,9 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
   const { mainNavLinks } = useNavigation(t, docsLink, headerNavModules);
 
   return (
-    <header className='text-semi-color-text-0 sticky top-0 z-50 transition-colors duration-300 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-lg'>
+    <header
+      className={`text-semi-color-text-0 sticky top-0 z-50 transition-colors duration-300 bg-white/75 dark:bg-zinc-900/75 backdrop-blur-lg ${isHomeRoute ? 'homepage-header' : ''}`}
+    >
       <NoticeModal
         visible={noticeVisible}
         onClose={handleNoticeClose}
@@ -111,8 +114,6 @@ const HeaderBar = ({ onMobileMenuToggle, drawerOpen }) => {
             isNewYear={isNewYear}
             unreadCount={unreadCount}
             onNoticeOpen={handleNoticeOpen}
-            theme={theme}
-            onThemeToggle={handleThemeToggle}
             currentLang={currentLang}
             onLanguageChange={handleLanguageChange}
             userState={userState}

@@ -40,6 +40,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
+import BlackholeBackground from '../../components/blackhole/BlackholeBackground';
 import {
   Moonshot,
   OpenAI,
@@ -156,25 +157,37 @@ const Home = () => {
         isMobile={isMobile}
       />
       {homePageContentLoaded && homePageContent === '' ? (
-        <div className='w-full overflow-x-hidden'>
+        <div className='w-full overflow-x-hidden bg-black'>
           {/* Banner 部分 */}
-          <div className='w-full border-b border-semi-color-border min-h-[500px] md:min-h-[600px] lg:min-h-[700px] relative overflow-x-hidden'>
-            {/* 背景模糊晕染球 */}
-            <div className='blur-ball blur-ball-indigo' />
-            <div className='blur-ball blur-ball-teal' />
-            <div className='flex items-center justify-center h-full px-4 py-20 md:py-24 lg:py-32 mt-10'>
+          <div
+            className='w-full border-b border-semi-color-border min-h-screen relative overflow-hidden'
+            style={{ minHeight: '100dvh' }}
+          >
+            {/* 黑洞背景 */}
+            <BlackholeBackground 
+              quality={isMobile ? 'low' : 'medium'}
+              enableBloom={true}
+              bloomStrength={0.8}
+              autoRotate={true}
+            />
+            
+            {/* 内容层 */}
+            <div
+              className='relative z-10 flex items-center justify-center min-h-screen px-4 py-8 md:py-10 lg:py-12'
+              style={{ minHeight: '100dvh' }}
+            >
               {/* 居中内容区 */}
-              <div className='flex flex-col items-center justify-center text-center max-w-4xl mx-auto'>
+              <div className='homepage-banner-content flex flex-col items-center justify-center text-center max-w-4xl mx-auto'>
                 <div className='flex flex-col items-center justify-center mb-6 md:mb-8'>
                   <h1
-                    className={`text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-semi-color-text-0 leading-tight ${isChinese ? 'tracking-wide md:tracking-wider' : ''}`}
+                    className={`homepage-hero-title text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-semi-color-text-0 leading-tight ${isChinese ? 'tracking-wide md:tracking-wider' : ''}`}
                   >
                     <span className='shine-text'>星空AI</span>
                   </h1>
-                  <p className='text-base md:text-lg lg:text-xl text-semi-color-text-1 mt-4 md:mt-6 max-w-xl'>
+                  <p className='homepage-hero-subtitle text-base md:text-lg lg:text-xl text-semi-color-text-1 mt-4 md:mt-6 max-w-xl'>
                     仰望星空，探索无极限
                   </p>
-                  <p className='text-sm md:text-base lg:text-lg text-semi-color-text-2 mt-2 md:mt-3 max-w-xl'>
+                  <p className='homepage-hero-description text-sm md:text-base lg:text-lg text-semi-color-text-2 mt-2 md:mt-3 max-w-xl'>
                     {t('更好的价格，更好的稳定性，只需要将模型基址替换为：')}
                   </p>
                   {/* BASE URL 与端点选择 */}
@@ -245,7 +258,7 @@ const Home = () => {
                   <div className='flex items-center mb-6 md:mb-8 justify-center'>
                     <Text
                       type='tertiary'
-                      className='text-lg md:text-xl lg:text-2xl font-light'
+                      className='homepage-hero-vendors-title text-lg md:text-xl lg:text-2xl font-light'
                     >
                       {t('支持众多的大模型供应商')}
                     </Text>

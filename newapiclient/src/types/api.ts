@@ -1,0 +1,151 @@
+// API 响应类型
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data?: T;
+}
+
+// 用户相关类型
+export interface User {
+  id: number;
+  username: string;
+  role: number;
+  status: number;
+  quota: number;
+  used_quota: number;
+  created_time: number;
+  group: string;
+}
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  role: number;
+  quota: number;
+}
+
+export interface UpdateUserRequest {
+  id: number;
+  username?: string;
+  role?: number;
+  status?: number;
+  quota?: number;
+}
+
+// 渠道相关类型
+export interface Channel {
+  id: number;
+  name: string;
+  type: number;
+  status: number;
+  models: string[];
+  balance: number;
+  priority: number;
+  created_time: number;
+}
+
+// 模型相关类型
+export interface Model {
+  id: number;
+  name: string;
+  ratio: number;
+  enabled: boolean;
+}
+
+// 兑换码相关类型
+export interface Redemption {
+  id: number;
+  name: string;
+  key: string;
+  quota: number;
+  status: number;
+  created_time: number;
+  expired_time: number;
+  redeemed_time: number;
+  used_user_id: number;
+}
+
+export interface CreateRedemptionRequest {
+  name: string;
+  quota: number;
+  count: number;
+  expired_time: number;
+}
+
+// 令牌相关类型
+export interface Token {
+  id: number;
+  name: string;
+  key: string;
+  status: number;
+  remain_quota: number;
+  unlimited_quota: boolean;
+  created_time: number;
+  expired_time: number;
+}
+
+// 日志相关类型
+export interface Log {
+  id: number;
+  user_id: number;
+  username: string;
+  model_name: string;
+  quota: number;
+  created_at: number;
+  channel_id: number;
+}
+
+// 系统状态类型
+export interface SystemStatus {
+  version: string;
+  start_time: number;
+  user_count: number;
+  channel_count: number;
+  token_count: number;
+}
+
+// 分页信息
+export interface PageInfo<T> {
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+// 认证相关类型
+export interface Credentials {
+  access_token: string;
+  user_id: number;
+  username: string;
+  role: number;
+}
+
+export interface LoginRequest {
+  base_url: string;
+  username: string;
+  password: string;
+}
+
+// 角色枚举
+export enum UserRole {
+  User = 1,
+  Admin = 10,
+  Root = 100,
+}
+
+// 状态枚举
+export enum UserStatus {
+  Disabled = 0,
+  Enabled = 1,
+}
+
+export enum ChannelStatus {
+  Disabled = 0,
+  Enabled = 1,
+}
+
+export enum RedemptionStatus {
+  Enabled = 1,
+  Used = 2,
+  Disabled = 3,
+}
