@@ -1,6 +1,6 @@
 use tauri::State;
 use serde::{Deserialize, Serialize};
-use crate::commands::auth::AppState;
+use crate::commands::auth::{get_authenticated_client, AppState};
 use crate::api::types::{User, CreateUserRequest, PageInfo};
 
 #[tauri::command]
@@ -9,9 +9,7 @@ pub async fn get_users(
     page_size: i32,
     state: State<'_, AppState>,
 ) -> Result<PageInfo<User>, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let endpoint = format!("/api/user/?page={}&page_size={}", page, page_size);
     let response = client.get::<PageInfo<User>>(&endpoint)
@@ -28,9 +26,7 @@ pub async fn search_users(
     page_size: i32,
     state: State<'_, AppState>,
 ) -> Result<PageInfo<User>, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let endpoint = format!(
         "/api/user/search?keyword={}&page={}&page_size={}",
@@ -48,9 +44,7 @@ pub async fn create_user(
     request: CreateUserRequest,
     state: State<'_, AppState>,
 ) -> Result<User, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let response = client.post::<CreateUserRequest, User>("/api/user/", &request)
         .await
@@ -77,9 +71,7 @@ pub async fn update_user(
     request: UpdateUserRequest,
     state: State<'_, AppState>,
 ) -> Result<User, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let response = client.put::<UpdateUserRequest, User>("/api/user/", &request)
         .await
@@ -97,9 +89,7 @@ pub async fn delete_user(
     user_id: i32,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let endpoint = format!("/api/user/{}", user_id);
     let response = client.delete::<serde_json::Value>(&endpoint)
@@ -125,9 +115,7 @@ pub async fn manage_user_quota(
     request: ManageUserRequest,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let response = client.post::<ManageUserRequest, serde_json::Value>("/api/user/manage", &request)
         .await

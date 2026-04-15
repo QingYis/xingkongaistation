@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { ConfigProvider, theme, App as AntApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';

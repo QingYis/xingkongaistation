@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Table, Button, Space, message, Tag, Popconfirm, Modal } from 'antd';
+import { Table, Button, Space, message, Tag, Popconfirm } from 'antd';
 import { PlusOutlined, DeleteOutlined, ClearOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { redemptionService } from '../../services/tauri';

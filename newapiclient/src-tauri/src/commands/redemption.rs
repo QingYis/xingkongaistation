@@ -1,5 +1,5 @@
 use tauri::State;
-use crate::commands::auth::AppState;
+use crate::commands::auth::{get_authenticated_client, AppState};
 use crate::api::types::{Redemption, CreateRedemptionRequest, PageInfo};
 
 #[tauri::command]
@@ -8,9 +8,7 @@ pub async fn get_redemptions(
     page_size: i32,
     state: State<'_, AppState>,
 ) -> Result<PageInfo<Redemption>, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let endpoint = format!("/api/redemption/?page={}&page_size={}", page, page_size);
     let response = client.get::<PageInfo<Redemption>>(&endpoint)
@@ -25,9 +23,7 @@ pub async fn create_redemptions(
     request: CreateRedemptionRequest,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let response = client.post::<CreateRedemptionRequest, Vec<String>>(
         "/api/redemption/",
@@ -47,9 +43,7 @@ pub async fn create_redemptions(
 pub async fn clean_invalid_redemptions(
     state: State<'_, AppState>,
 ) -> Result<i32, String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let response = client.delete::<i32>("/api/redemption/invalid")
         .await
@@ -67,9 +61,7 @@ pub async fn delete_redemption(
     redemption_id: i32,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let client = state.api_client.lock().unwrap();
-    let client = client.as_ref()
-        .ok_or("Not authenticated")?;
+    let client = get_authenticated_client(&state)?;
     
     let endpoint = format!("/api/redemption/{}", redemption_id);
     let response = client.delete::<serde_json::Value>(&endpoint)

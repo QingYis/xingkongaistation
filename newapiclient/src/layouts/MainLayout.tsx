@@ -15,8 +15,8 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from '@ant-design/icons';
-import { useAuthStore } from '../../stores/authStore';
-import { authService } from '../../services/tauri';
+import { useAuthStore } from '../stores/authStore';
+import { authService } from '../services/tauri';
 
 const { Header, Sider, Content } = Layout;
 

@@ -10,6 +10,15 @@ pub struct AppState {
     pub base_url: Mutex<String>,
 }
 
+pub fn get_authenticated_client(state: &AppState) -> Result<ApiClient, String> {
+    state
+        .api_client
+        .lock()
+        .map_err(|_| "Failed to lock API client state".to_string())?
+        .clone()
+        .ok_or("Not authenticated".to_string())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
     pub base_url: String,
