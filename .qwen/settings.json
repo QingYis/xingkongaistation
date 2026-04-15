@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone *)",
+      "Read(C:\\Users\\18782\\.qwen/**)",
+      "Bash(go *)",
+      "Bash(netstat *)"
+    ]
+  },
+  "$version": 3
+}
