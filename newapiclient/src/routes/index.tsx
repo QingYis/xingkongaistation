@@ -4,6 +4,8 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import UserList from '../pages/Users/List';
 import RedemptionList from '../pages/Redemptions/List';
+import TokenList from '../pages/Tokens/List';
+import Settings from '../pages/Settings';
 
 export const router = createBrowserRouter([
   {
@@ -41,7 +43,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'tokens',
-        element: <div>令牌列表 - 待实现</div>,
+        element: <TokenList />,
       },
       {
         path: 'logs',
@@ -49,7 +51,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'settings',
-        element: <div>设置 - 待实现</div>,
+        element: <Settings />,
       },
     ],
   },

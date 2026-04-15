@@ -34,6 +34,27 @@ pub fn run() {
             commands::redemption::create_redemptions,
             commands::redemption::clean_invalid_redemptions,
             commands::redemption::delete_redemption,
+            // Dashboard
+            commands::dashboard::get_system_status,
+            commands::dashboard::get_dashboard_stats,
+            commands::dashboard::get_quota_data,
+            commands::dashboard::get_log_stats,
+            // Token
+            commands::token::get_tokens,
+            commands::token::search_tokens,
+            commands::token::create_token,
+            commands::token::update_token,
+            commands::token::delete_token,
+            commands::token::get_token_key,
+            commands::token::delete_tokens_batch,
+            // Settings
+            commands::settings::get_system_options,
+            commands::settings::update_system_option,
+            commands::settings::get_performance_stats,
+            commands::settings::clear_disk_cache,
+            commands::settings::force_gc,
+            commands::settings::get_log_files,
+            commands::settings::cleanup_log_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

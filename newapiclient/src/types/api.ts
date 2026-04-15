@@ -84,6 +84,41 @@ export interface Token {
   expired_time: number;
 }
 
+export interface CreateTokenRequest {
+  name: string;
+  remain_quota: number;
+  expired_time: number;
+  unlimited_quota: boolean;
+}
+
+export interface UpdateTokenRequest {
+  id: number;
+  name?: string;
+  status?: number;
+  remain_quota?: number;
+  expired_time?: number;
+  unlimited_quota?: boolean;
+}
+
+// 系统设置相关类型
+export interface SystemOption {
+  key: string;
+  value: string;
+}
+
+export interface PerformanceStats {
+  cpu_usage: number;
+  memory_usage: number;
+  disk_usage: number;
+  goroutines: number;
+}
+
+export interface LogFile {
+  name: string;
+  size: number;
+  modified_time: number;
+}
+
 // 日志相关类型
 export interface Log {
   id: number;
@@ -99,9 +134,24 @@ export interface Log {
 export interface SystemStatus {
   version: string;
   start_time: number;
+}
+
+export interface DashboardStats {
   user_count: number;
   channel_count: number;
   token_count: number;
+}
+
+export interface QuotaDataPoint {
+  date: string;
+  quota: number;
+}
+
+export interface LogStats {
+  total_count: number;
+  total_quota: number;
+  today_count: number;
+  today_quota: number;
 }
 
 // 分页信息

@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { redemptionService } from '../../services/tauri';
 import type { Redemption } from '../../types/api';
 import { RedemptionStatus } from '../../types/api';
+import CreateModal from './CreateModal';
 
 export default function RedemptionList() {
   const [loading, setLoading] = useState(false);
@@ -12,6 +13,7 @@ export default function RedemptionList() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const loadRedemptions = async () => {
     setLoading(true);
@@ -171,7 +173,11 @@ export default function RedemptionList() {
               清除失效
             </Button>
           </Popconfirm>
-          <Button type="primary" icon={<PlusOutlined />}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalOpen(true)}
+          >
             批量创建
           </Button>
         </Space>
@@ -195,6 +201,15 @@ export default function RedemptionList() {
           },
         }}
         scroll={{ x: 1400 }}
+      />
+
+      <CreateModal
+        open={createModalOpen}
+        onCancel={() => setCreateModalOpen(false)}
+        onSuccess={() => {
+          setCreateModalOpen(false);
+          loadRedemptions();
+        }}
       />
     </div>
   );

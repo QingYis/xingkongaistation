@@ -46,6 +46,13 @@ i18n
       vi: viTranslation,
     },
     fallbackLng: 'zh-CN',
+    // 首次访问默认简体中文：不根据浏览器 navigator 自动选英文；用户切换语言后会写入 localStorage
+    detection: {
+      order: ['querystring', 'localStorage'],
+      lookupQuerystring: 'lng',
+      lookupLocalStorage: 'i18nextLng',
+      caches: ['localStorage'],
+    },
     nsSeparator: false,
     interpolation: {
       escapeValue: false,
