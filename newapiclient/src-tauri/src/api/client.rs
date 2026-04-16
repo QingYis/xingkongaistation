@@ -21,9 +21,10 @@ impl ApiClient {
     pub fn new(base_url: String) -> Result<Self> {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .cookie_store(true)  // 启用 cookie 存储，保持 session
             .build()
             .context("Failed to create HTTP client")?;
-        
+
         Ok(Self {
             base_url: base_url.trim_end_matches('/').to_string(),
             access_token: None,

@@ -62,20 +62,17 @@ impl AuthManager {
         
         let access_token = token_response.data
             .context("No access token in response")?;
-        
-        // 3. 获取用户信息
-        let mut auth_client = ApiClient::new(base_url.to_string())?;
-        auth_client.set_credentials(access_token.clone(), 0);
-        
+
+        // 3. 获取用户信息（使用同一个 client 保持 session）
         #[derive(Deserialize)]
         struct UserInfo {
             id: i32,
             username: String,
             role: i32,
         }
-        
-        let user_response: crate::api::client::ApiResponse<UserInfo> = 
-            auth_client.get("/api/user/self").await?;
+
+        let user_response: crate::api::client::ApiResponse<UserInfo> =
+            client.get("/api/user/self").await?;
         
         let user_info = user_response.data
             .context("No user info in response")?;

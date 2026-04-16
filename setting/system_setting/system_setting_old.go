@@ -1,6 +1,6 @@
 package system_setting
 
-var ServerAddress = "https://xingkongaiapi.zeabur.app"
+var ServerAddress = "https://xingkongai.zeabur.app"
 var WorkerUrl = ""
 var WorkerValidKey = ""
 var WorkerAllowHttpImageRequestEnabled = false

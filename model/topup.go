@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrPaymentMethodMismatch = errors.New("payment method mismatch")
+
 type TopUp struct {
 	Id               int     `json:"id"`
 	UserId           int     `json:"user_id" gorm:"index"`
@@ -72,6 +74,10 @@ func Recharge(referenceId string, customerId string) (err error) {
 		err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", referenceId).First(topUp).Error
 		if err != nil {
 			return errors.New("充值订单不存在")
+		}
+
+		if topUp.PaymentMethod != "stripe" {
+			return ErrPaymentMethodMismatch
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
@@ -325,6 +331,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 			return errors.New("充值订单不存在")
 		}
 
+		if topUp.PaymentMethod != "creem" {
+			return ErrPaymentMethodMismatch
+		}
+
 		if topUp.Status != common.TopUpStatusPending {
 			return errors.New("充值订单状态错误")
 		}
@@ -398,6 +408,10 @@ func RechargeWaffo(tradeNo string) (err error) {
 
 		if topUp.Status == common.TopUpStatusSuccess {
 			return nil // 幂等：已成功直接返回
+		}
+
+		if topUp.PaymentMethod != "wafo" {
+			return ErrPaymentMethodMismatch
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
