@@ -274,6 +274,9 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 
 	if summary.TotalTokens == 0 {
 		summary.Quota = 0
+	} else if summary.CompletionTokens == 0 {
+		// 输出token为0时，不扣取任何费用
+		summary.Quota = 0
 	} else if !ratio.IsZero() && summary.Quota == 0 {
 		summary.Quota = 1
 	}
@@ -291,7 +294,7 @@ func usageSemanticFromUsage(relayInfo *relaycommon.RelayInfo, usage *dto.Usage) 
 	return "openai"
 }
 
-func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent []string) {
+func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent []string) error {
 	originUsage := usage
 	if usage == nil {
 		extraContent = append(extraContent, "上游无计费信息")
@@ -427,4 +430,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
 	})
+	
+	// 输出token为0时返回错误,触发重试
+	if summary.CompletionTokens == 0 && summary.TotalTokens > 0 {
+		return fmt.Errorf("completion tokens is 0, request failed")
+	}
+	
+	return nil
 }

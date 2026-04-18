@@ -164,13 +164,13 @@ const Home = () => {
             style={{ minHeight: '100dvh' }}
           >
             {/* 黑洞背景 */}
-            <BlackholeBackground 
+            <BlackholeBackground
               quality={isMobile ? 'low' : 'medium'}
-              enableBloom={true}
+              enableBloom={!isMobile}
               bloomStrength={0.8}
               autoRotate={true}
             />
-            
+
             {/* 内容层 */}
             <div
               className='relative z-10 flex items-center justify-center min-h-screen px-4 py-8 md:py-10 lg:py-12'

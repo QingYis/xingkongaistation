@@ -8,15 +8,17 @@ import (
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 )
 
 type RetryParam struct {
-	Ctx          *gin.Context
-	TokenGroup   string
-	ModelName    string
-	Retry        *int
-	resetNextTry bool
+	Ctx             *gin.Context
+	TokenGroup      string
+	ModelName       string
+	Retry           *int
+	resetNextTry    bool
+	RequestProtocol types.RelayFormat // 请求协议类型，用于智能路由
 }
 
 func (p *RetryParam) GetRetry() int {

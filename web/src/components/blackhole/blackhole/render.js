@@ -20,10 +20,18 @@ export function getContainerSize(container) {
 }
 
 export function getRenderPixelRatio(pixelRatioCap = MAX_RENDER_PIXEL_RATIO) {
-  return Math.min(window.devicePixelRatio || 1, pixelRatioCap);
+  const isMobile =
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+  const maxRatio = isMobile ? 1.5 : pixelRatioCap;
+  return Math.min(window.devicePixelRatio || 1, maxRatio);
 }
 
-export function createRenderer(container, { pixelRatioCap = MAX_RENDER_PIXEL_RATIO } = {}) {
+export function createRenderer(
+  container,
+  { pixelRatioCap = MAX_RENDER_PIXEL_RATIO } = {},
+) {
   const { width, height } = getContainerSize(container);
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setClearColor(0x000000, 0);
@@ -33,7 +41,10 @@ export function createRenderer(container, { pixelRatioCap = MAX_RENDER_PIXEL_RAT
   return renderer;
 }
 
-export function createScene(renderer, { enableBloom = true, bloomStrength = 0.8 } = {}) {
+export function createScene(
+  renderer,
+  { enableBloom = true, bloomStrength = 0.8 } = {},
+) {
   const scene = new THREE.Scene();
   const camera = new THREE.Camera();
   camera.position.z = 1;
@@ -46,7 +57,14 @@ export function createScene(renderer, { enableBloom = true, bloomStrength = 0.8 
   composer.addPass(renderPass);
 
   if (enableBloom) {
-    bloomPass = new UnrealBloomPass(new Vector2(128, 128), bloomStrength, 2.0, 0.0);
+    // Use 50% resolution for bloom pass to improve performance
+    const { width, height } = renderer.getSize(new THREE.Vector2());
+    bloomPass = new UnrealBloomPass(
+      new Vector2(width * 0.5, height * 0.5),
+      bloomStrength,
+      2.0,
+      0.0,
+    );
     composer.addPass(bloomPass);
   }
 
@@ -75,9 +93,18 @@ export function loadTextures(onTextureLoad) {
 
   loadTexture('bg1', '/assets/blackhole/milkyway.jpg', THREE.NearestFilter);
   loadTexture('star', '/assets/blackhole/star_noise.png', THREE.LinearFilter);
-  loadTexture('disk', '/assets/blackhole/accretion_disk.png', THREE.LinearFilter);
+  loadTexture(
+    'disk',
+    '/assets/blackhole/accretion_disk.png',
+    THREE.LinearFilter,
+  );
 
-  function loadTexture(name, image, interpolation, wrap = THREE.ClampToEdgeWrapping) {
+  function loadTexture(
+    name,
+    image,
+    interpolation,
+    wrap = THREE.ClampToEdgeWrapping,
+  ) {
     textures.set(name, null);
     textureLoader.load(image, (texture) => {
       texture.magFilter = interpolation;
@@ -92,7 +119,10 @@ export function loadTextures(onTextureLoad) {
   return textures;
 }
 
-export async function createShaderProjectionPlane(uniforms, quality = 'medium') {
+export async function createShaderProjectionPlane(
+  uniforms,
+  quality = 'medium',
+) {
   const defines = getShaderDefineConstant(quality);
   const material = new THREE.ShaderMaterial({
     uniforms: uniforms,
@@ -113,24 +143,24 @@ export async function createShaderProjectionPlane(uniforms, quality = 'medium') 
     let STEP, NSTEPS;
     switch (quality) {
       case 'low':
-        STEP = 0.1;
-        NSTEPS = 300;
+        STEP = 0.12;
+        NSTEPS = 250;
         break;
       case 'medium':
-        STEP = 0.05;
-        NSTEPS = 600;
+        STEP = 0.06;
+        NSTEPS = 500;
         break;
       case 'high':
-        STEP = 0.02;
-        NSTEPS = 1000;
+        STEP = 0.03;
+        NSTEPS = 800;
         break;
       default:
-        STEP = 0.05;
-        NSTEPS = 600;
+        STEP = 0.06;
+        NSTEPS = 500;
     }
     return `
-#define STEP ${STEP} 
-#define NSTEPS ${NSTEPS} 
+#define STEP ${STEP}
+#define NSTEPS ${NSTEPS}
 `;
   }
 

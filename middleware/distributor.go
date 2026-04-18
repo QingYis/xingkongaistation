@@ -128,11 +128,15 @@ func Distribute() func(c *gin.Context) {
 				}
 
 				if channel == nil {
+					// 智能路由：检测请求协议
+					requestProtocol := detectRequestProtocol(c)
+					
 					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(&service.RetryParam{
-						Ctx:        c,
-						ModelName:  modelRequest.Model,
-						TokenGroup: usingGroup,
-						Retry:      common.GetPointer(0),
+						Ctx:             c,
+						ModelName:       modelRequest.Model,
+						TokenGroup:      usingGroup,
+						Retry:           common.GetPointer(0),
+						RequestProtocol: requestProtocol,
 					})
 					if err != nil {
 						showGroup := usingGroup

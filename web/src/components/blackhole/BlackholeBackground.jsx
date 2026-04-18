@@ -26,6 +26,10 @@ const BlackholeBackground = ({
     let animationId;
     let disposed = false;
     let lastFrameTime;
+    
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
 
     const init = async () => {
       // Create renderer
@@ -39,7 +43,10 @@ const BlackholeBackground = ({
       });
 
       // Create camera
-      const { observer, cameraControl } = createCamera(container, renderer.domElement);
+      const { observer, cameraControl } = createCamera(
+        container,
+        renderer.domElement,
+      );
       scene.add(observer);
 
       // Set up uniforms
@@ -120,11 +127,34 @@ const BlackholeBackground = ({
 
       handleResize();
 
-      // Animation loop
+      // Animation loop with adaptive frame rate limiting
+      const targetFPS = isMobile ? 24 : 30;
+      const frameInterval = 1000 / targetFPS;
+      let lastRenderTime = 0;
+      let skipFrames = 0;
+
       const animate = (frameTime) => {
         if (disposed) {
           return;
         }
+
+        // Frame rate limiting with adaptive skipping
+        const elapsed = frameTime - lastRenderTime;
+        if (elapsed < frameInterval) {
+          animationId = requestAnimationFrame(animate);
+          return;
+        }
+        
+        // Skip every other frame when tab is not focused
+        if (!document.hasFocus()) {
+          skipFrames++;
+          if (skipFrames % 2 !== 0) {
+            animationId = requestAnimationFrame(animate);
+            return;
+          }
+        }
+        
+        lastRenderTime = frameTime - (elapsed % frameInterval);
 
         if (lastFrameTime === undefined) {
           lastFrameTime = frameTime;
@@ -150,6 +180,22 @@ const BlackholeBackground = ({
       window.addEventListener('resize', handleResize);
       animationId = requestAnimationFrame(animate);
 
+      // Visibility change handler - pause when tab is hidden
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+          }
+        } else {
+          if (!animationId) {
+            lastRenderTime = 0;
+            animationId = requestAnimationFrame(animate);
+          }
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
       // Store refs for cleanup
       blackholeRef.current = {
         renderer,
@@ -159,6 +205,7 @@ const BlackholeBackground = ({
         cameraControl,
         textures,
         handleResize,
+        handleVisibilityChange,
         mesh,
       };
     };
@@ -174,9 +221,21 @@ const BlackholeBackground = ({
       }
 
       if (blackholeRef.current) {
-        const { renderer, scene, composer, cameraControl, textures, handleResize } = blackholeRef.current;
-        
+        const {
+          renderer,
+          scene,
+          composer,
+          cameraControl,
+          textures,
+          handleResize,
+          handleVisibilityChange,
+        } = blackholeRef.current;
+
         window.removeEventListener('resize', handleResize);
+        document.removeEventListener(
+          'visibilitychange',
+          handleVisibilityChange,
+        );
         cameraControl.dispose();
 
         // Dispose textures
@@ -211,7 +270,7 @@ const BlackholeBackground = ({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full"
+      className='absolute inset-0 w-full h-full'
       style={{ zIndex: 0 }}
     />
   );

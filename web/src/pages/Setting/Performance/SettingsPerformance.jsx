@@ -328,6 +328,29 @@ export default function SettingsPerformance(props) {
             </Row>
           </Form.Section>
 
+          <Form.Section text={t('渠道智能路由')}>
+            <Banner
+              type='info'
+              description={t(
+                '启用后，系统会根据请求协议（OpenAI/Claude/Gemini）优先选择协议匹配的渠道，减少协议转换开销，提升响应速度。',
+              )}
+              style={{ marginBottom: 16 }}
+            />
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Switch
+                  field={'ChannelSmartRoutingEnabled'}
+                  label={t('启用渠道智能路由')}
+                  extraText={t('优先选择协议匹配的渠道')}
+                  size='default'
+                  checkedText='｜'
+                  uncheckedText='〇'
+                  onChange={handleFieldChange('ChannelSmartRoutingEnabled')}
+                />
+              </Col>
+            </Row>
+          </Form.Section>
+
           <Form.Section text={t('系统性能监控')}>
             <Banner
               type='info'

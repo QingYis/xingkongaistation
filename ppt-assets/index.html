@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星空AI — 下一代 AI API 网关</title>
+  <meta name="description" content="星空AI中转站，卷爆所有中转站的下一代AI API网关">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<!-- NAV DOTS -->
+<nav class="nav-dots">
+  <div class="nav-dot active" title="首页"></div>
+  <div class="nav-dot" title="模型矩阵"></div>
+  <div class="nav-dot" title="立即启航"></div>
+  <div class="nav-dot" title="快速接入"></div>
+  <div class="nav-dot" title="全程护航"></div>
+</nav>
+
+<!-- ========== SLIDE 1 — HERO ========== -->
+<section class="slide" id="slide-hero">
+  <div class="hero-bg"></div>
+  <div class="hero-rings">
+    <div class="hero-ring"></div>
+    <div class="hero-ring"></div>
+    <div class="hero-ring"></div>
+  </div>
+  <div class="slide-content" style="position:relative;z-index:3;">
+    <h1 class="hero-title fade-in">星空AI</h1>
+    <p class="hero-subtitle fade-in delay-1">卷爆所有中转站的星空AI来了！</p>
+    <p class="hero-tagline fade-in delay-2">NEXT-GENERATION AI API GATEWAY</p>
+  </div>
+  <div class="scroll-hint">
+    <span>SCROLL</span>
+    <div class="arrow"></div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 2 — MODEL MATRIX ========== -->
+<section class="slide" id="slide-models">
+  <div class="slide-bg"></div>
+  <div class="slide-content">
+    <h2 class="section-title fade-in">AI 模型矩阵</h2>
+
+    <div class="model-grid">
+      <div class="model-card fade-in delay-1">
+        <div class="model-name">claude-haiku-4.5</div>
+        <span class="model-tier tier-light">轻量级</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$1.0000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$5.0000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-2">
+        <div class="model-name">claude-haiku-4.5-thinking</div>
+        <span class="model-tier tier-think">思考型</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$1.5000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$7.5000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-3">
+        <div class="model-name">claude-sonnet-4</div>
+        <span class="model-tier tier-std">标准版</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$2.0000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$10.0000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-4">
+        <div class="model-name">claude-sonnet-4.5</div>
+        <span class="model-tier tier-plus">增强版</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$2.5000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$12.5000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-5">
+        <div class="model-name">claude-sonnet-4.5-thinking</div>
+        <span class="model-tier tier-flag">旗舰版</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$3.7500</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$18.7500</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-5">
+        <div class="model-name">deepseek-3.2-thinking</div>
+        <span class="model-tier tier-think" style="background: rgba(59,130,246,0.2); color: #60a5fa;">深度思考</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$2.5000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$12.5000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-5">
+        <div class="model-name">glm-5-thinking</div>
+        <span class="model-tier tier-think" style="background: rgba(168,85,247,0.2); color: #c084fc;">深度思考</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$5.0000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$25.0000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-5">
+        <div class="model-name">minimax-m2.5-thinking</div>
+        <span class="model-tier tier-think" style="background: rgba(156,163,175,0.2); color: #9ca3af;">深度思考</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$2.5000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$12.5000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+
+      <div class="model-card fade-in delay-5">
+        <div class="model-name">qwen3-coder-next-thinking</div>
+        <span class="model-tier tier-think" style="background: rgba(129,140,248,0.2); color: #818cf8;">深度思考</span>
+        <div class="price-row"><span class="price-label">输入价格</span><span class="price-val">$2.5000</span></div>
+        <div class="price-row"><span class="price-label">补全价格</span><span class="price-val">$12.5000</span></div>
+        <div class="price-unit">/ 1M Tokens</div>
+      </div>
+    </div>
+
+    <div class="price-highlight fade-in delay-3">
+      <span class="rmb">¥1</span>
+      <span class="eq">=</span>
+      <span class="usd">$100</span>
+      <div class="desc">≈ 1500次 claude-sonnet-4.5-thinking 请求 ≈ 2000W token</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 3 — LAUNCH ========== -->
+<section class="slide" id="slide-launch">
+  <div class="slide-bg"></div>
+  <div class="slide-content">
+    <h2 class="section-title fade-in">立即启航</h2>
+
+    <div class="launch-grid">
+      <div>
+        <div class="site-card fade-in delay-1">
+          <div class="icon">🌐</div>
+          <div class="name">星空AI中转站</div>
+          <div class="url">xingkongai.zeabur.app</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-label fade-in delay-1">核心优势</div>
+        <div class="advantage-list">
+          <div class="adv-card fade-in delay-2">
+            <div class="adv-icon">⚡</div>
+            <div>
+              <div class="adv-title">支持高并发 · 无请求限制</div>
+              <div class="adv-desc">轻松应对大规模调用</div>
+            </div>
+          </div>
+          <div class="adv-card fade-in delay-3">
+            <div class="adv-icon">🚀</div>
+            <div>
+              <div class="adv-title">请求速度极快 · 毫秒级响应</div>
+              <div class="adv-desc">极致性能体验</div>
+            </div>
+          </div>
+          <div class="adv-card fade-in delay-4">
+            <div class="adv-icon">🌏</div>
+            <div>
+              <div class="adv-title">国内无须魔法 · 直连访问</div>
+              <div class="adv-desc">稳定可靠</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 4 — STEPS ========== -->
+<section class="slide" id="slide-steps">
+  <div class="slide-bg"></div>
+  <div class="slide-content">
+    <h2 class="section-title fade-in">快速接入</h2>
+
+    <div class="steps-grid">
+      <div class="step-card fade-in delay-1">
+        <div class="step-num">01</div>
+        <div class="step-icon">👤</div>
+        <div class="step-title">注册账号</div>
+        <div class="step-desc">赠送 10$</div>
+        <div class="step-connector">›</div>
+      </div>
+      <div class="step-card fade-in delay-2">
+        <div class="step-num">02</div>
+        <div class="step-icon">🔑</div>
+        <div class="step-title">获取令牌</div>
+        <div class="step-desc">生成 API Token</div>
+        <div class="step-connector">›</div>
+      </div>
+      <div class="step-card fade-in delay-3">
+        <div class="step-num">03</div>
+        <div class="step-icon">🌐</div>
+        <div class="step-title">配置请求地址</div>
+        <div class="step-desc">xingkongai.zeabur.app</div>
+      </div>
+      <div class="step-card fade-in delay-1">
+        <div class="step-num">04</div>
+        <div class="step-icon">⚙️</div>
+        <div class="step-title">配置令牌</div>
+        <div class="step-desc">填入获取到的令牌</div>
+        <div class="step-connector">›</div>
+      </div>
+      <div class="step-card fade-in delay-2">
+        <div class="step-num">05</div>
+        <div class="step-icon">📋</div>
+        <div class="step-title">配置API格式</div>
+        <div class="step-desc">Anthropic / OpenAI</div>
+        <div class="step-connector">›</div>
+      </div>
+      <div class="step-card fade-in delay-3">
+        <div class="step-num">06</div>
+        <div class="step-icon">✨</div>
+        <div class="step-title">完美应用</div>
+        <div class="step-desc">Claude Code / Kilo / OpenCode</div>
+      </div>
+    </div>
+
+    <div class="cta-banner fade-in delay-4">
+      <span class="cta-icon">💡</span>
+      <span class="cta-text">新用户注册即送 10$ 额度，立即开始体验！</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SLIDE 5 — SUPPORT ========== -->
+<section class="slide" id="slide-support">
+  <div class="slide-bg"></div>
+  <div class="slide-content">
+    <h2 class="section-title fade-in">全程护航</h2>
+
+    <div class="support-content">
+      <div class="shield-icon fade-in delay-1">🛡️</div>
+      <div class="support-subtitle fade-in delay-2">完整的售后服务</div>
+
+      <div class="qq-card fade-in delay-3">
+        <div class="qq-icon">💬</div>
+        <div class="qq-label">加入技术支持QQ群</div>
+        <div class="qq-number">978772109</div>
+      </div>
+
+      <div class="support-footer fade-in delay-4">
+        7×24 小时技术支持 · 随时为您解答疑问
+      </div>
+    </div>
+  </div>
+</section>
+
+<script src="script.js"></script>
+</body>
+</html>

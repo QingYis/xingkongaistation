@@ -42,5 +42,6 @@ func WssHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.
 		return newAPIError
 	}
 	service.PostWssConsumeQuota(c, info, info.UpstreamModelName, usage.(*dto.RealtimeUsage), "")
+	// PostWssConsumeQuota 不返回错误,因为 WebSocket 连接已经关闭,无法触发重试
 	return nil
 }
