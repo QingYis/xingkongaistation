@@ -37,10 +37,20 @@ const PerformanceSetting = () => {
     const res = await API.get('/api/option/');
     const { success, message, data } = res.data;
     if (success) {
-      let newInputs = {};
+      // 保留初始默认值，用 API 返回值覆盖
+      let newInputs = {
+        'performance_setting.disk_cache_enabled': false,
+        'performance_setting.disk_cache_threshold_mb': 10,
+        'performance_setting.disk_cache_max_size_mb': 1024,
+        'performance_setting.disk_cache_path': '',
+        'ChannelSmartRoutingEnabled': false,
+      };
       data.forEach((item) => {
-        if (typeof inputs[item.key] === 'boolean') {
+        // 根据初始默认值类型决定如何解析
+        if (typeof newInputs[item.key] === 'boolean') {
           newInputs[item.key] = toBoolean(item.value);
+        } else if (typeof newInputs[item.key] === 'number') {
+          newInputs[item.key] = parseInt(item.value) || newInputs[item.key];
         } else {
           newInputs[item.key] = item.value;
         }
