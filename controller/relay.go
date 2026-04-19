@@ -233,6 +233,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
 		}
+		if common.ChannelSmartRoutingEnabled && relayInfo.RelayFormat != "" {
+			common.SetContextKey(c, constant.ContextKeyChannelSmartRoutingUseConventional, true)
+		}
 	}
 
 	useChannel := c.GetStringSlice("use_channel")
@@ -556,6 +559,9 @@ func RelayTask(c *gin.Context) {
 
 		if !shouldRetryTaskRelay(c, channel.Id, taskErr, common.RetryTimes-retryParam.GetRetry()) {
 			break
+		}
+		if common.ChannelSmartRoutingEnabled && relayInfo.RelayFormat != "" {
+			common.SetContextKey(c, constant.ContextKeyChannelSmartRoutingUseConventional, true)
 		}
 	}
 

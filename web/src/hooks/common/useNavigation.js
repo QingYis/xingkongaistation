@@ -50,7 +50,7 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         to: '/pricing',
       },
       {
-        text: t('关于'),
+        text: t('使用教程'),
         itemKey: 'about',
         to: '/about',
       },

@@ -37,6 +37,8 @@ const (
 	ContextKeyChannelIsMultiKey        ContextKey = "channel_is_multi_key"
 	ContextKeyChannelMultiKeyIndex     ContextKey = "channel_multi_key_index"
 	ContextKeyChannelKey               ContextKey = "channel_key"
+	// ContextKeyChannelSmartRoutingUseConventional：智能路由开启时，上游请求失败后置为 true，后续选路按常规优先级/全量渠道重试。
+	ContextKeyChannelSmartRoutingUseConventional ContextKey = "channel_smart_routing_use_conventional"
 
 	ContextKeyAutoGroup           ContextKey = "auto_group"
 	ContextKeyAutoGroupIndex      ContextKey = "auto_group_index"

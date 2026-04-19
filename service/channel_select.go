@@ -47,6 +47,24 @@ func (p *RetryParam) ResetRetryNextTry() {
 	p.resetNextTry = true
 }
 
+// pickChannelWithOptionalProtocolPreference 智能路由开启且未进入「常规重试」阶段时，仅在协议匹配子集上按优先级选路；子集为空则回退为全量渠道。上游失败后会置 ContextKeyChannelSmartRoutingUseConventional，此后始终走 GetRandomSatisfiedChannel。
+func pickChannelWithOptionalProtocolPreference(ctx *gin.Context, group, modelName string, priorityRetry int, requestProtocol types.RelayFormat) (*model.Channel, error) {
+	if !common.ChannelSmartRoutingEnabled || requestProtocol == "" {
+		return model.GetRandomSatisfiedChannel(group, modelName, priorityRetry)
+	}
+	if common.GetContextKeyBool(ctx, constant.ContextKeyChannelSmartRoutingUseConventional) {
+		return model.GetRandomSatisfiedChannel(group, modelName, priorityRetry)
+	}
+	ch, err := model.GetRandomSatisfiedChannelProtocolMatchOnly(group, modelName, priorityRetry, requestProtocol)
+	if err != nil {
+		return nil, err
+	}
+	if ch == nil {
+		return model.GetRandomSatisfiedChannel(group, modelName, priorityRetry)
+	}
+	return ch, nil
+}
+
 // CacheGetRandomSatisfiedChannel tries to get a random channel that satisfies the requirements.
 // 尝试获取一个满足要求的随机渠道。
 //
@@ -117,11 +135,9 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			}
 			logger.LogDebug(param.Ctx, "Auto selecting group: %s, priorityRetry: %d", autoGroup, priorityRetry)
 
-			// 根据智能路由开关选择渠道选择函数
-			if common.ChannelSmartRoutingEnabled && param.RequestProtocol != "" {
-				channel, _ = model.GetRandomSatisfiedChannelWithSmartRouting(autoGroup, param.ModelName, priorityRetry, param.RequestProtocol)
-			} else {
-				channel, _ = model.GetRandomSatisfiedChannel(autoGroup, param.ModelName, priorityRetry)
+			channel, err = pickChannelWithOptionalProtocolPreference(param.Ctx, autoGroup, param.ModelName, priorityRetry, param.RequestProtocol)
+			if err != nil {
+				return nil, selectGroup, err
 			}
 			if channel == nil {
 				// Current group has no available channel for this model, try next group
@@ -160,12 +176,7 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			break
 		}
 	} else {
-		// 根据智能路由开关选择渠道选择函数
-		if common.ChannelSmartRoutingEnabled && param.RequestProtocol != "" {
-			channel, err = model.GetRandomSatisfiedChannelWithSmartRouting(param.TokenGroup, param.ModelName, param.GetRetry(), param.RequestProtocol)
-		} else {
-			channel, err = model.GetRandomSatisfiedChannel(param.TokenGroup, param.ModelName, param.GetRetry())
-		}
+		channel, err = pickChannelWithOptionalProtocolPreference(param.Ctx, param.TokenGroup, param.ModelName, param.GetRetry(), param.RequestProtocol)
 		if err != nil {
 			return nil, param.TokenGroup, err
 		}
