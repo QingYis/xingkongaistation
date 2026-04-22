@@ -8,7 +8,12 @@ import {
   createShaderProjectionPlane,
   getContainerSize,
   getRenderPixelRatio,
+  ResolutionScaler,
 } from './blackhole/render';
+
+const ACTIVE_FPS = 28;
+const IDLE_FPS = 10;
+const IDLE_TIMEOUT_MS = 3000;
 
 const BlackholeBackground = ({
   quality = 'medium',
@@ -26,30 +31,27 @@ const BlackholeBackground = ({
     let animationId;
     let disposed = false;
     let lastFrameTime;
-    
+
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     );
+    const effectiveQuality = isMobile ? 'low' : quality;
+    const effectiveBloom = isMobile ? false : enableBloom;
 
     const init = async () => {
-      // Create renderer
       const renderer = createRenderer(container);
-      container.appendChild(renderer.domElement);
 
-      // Create scene and post-processing
-      const { scene, composer } = createScene(renderer, {
-        enableBloom,
+      const { scene, composer, bloomPass } = createScene(renderer, {
+        enableBloom: effectiveBloom,
         bloomStrength,
       });
 
-      // Create camera
       const { observer, cameraControl } = createCamera(
         container,
         renderer.domElement,
       );
       scene.add(observer);
 
-      // Set up uniforms
       const uniforms = {
         time: { type: 'f', value: 0.0 },
         resolution: { type: 'v2', value: new THREE.Vector2() },
@@ -73,21 +75,18 @@ const BlackholeBackground = ({
         disk: uniforms.disk_texture,
       };
 
-      // Load textures
       const textures = loadTextures((name, texture) => {
         if (disposed) {
           texture.dispose();
           return;
         }
-
         const uniform = textureUniformMap[name];
         if (uniform) {
           uniform.value = texture;
         }
       });
 
-      // Create shader plane
-      const { mesh } = await createShaderProjectionPlane(uniforms, quality);
+      const { mesh } = await createShaderProjectionPlane(uniforms, effectiveQuality);
 
       if (disposed) {
         mesh.geometry.dispose();
@@ -106,81 +105,102 @@ const BlackholeBackground = ({
 
       scene.add(mesh);
 
-      // Set camera properties
       observer.distance = 10.0;
       observer.moving = autoRotate;
       observer.fov = 60.0;
       uniforms.fov.value = observer.fov;
 
+      const scaler = new ResolutionScaler(renderer, composer);
+      const { width: initW, height: initH } = getContainerSize(container);
+      const initSize = scaler.setSize(initW, initH);
+      uniforms.resolution.value.set(
+        renderer.domElement.width || initSize.width,
+        renderer.domElement.height || initSize.height,
+      );
+      observer.aspect = initW / initH;
+      observer.updateProjectionMatrix();
+      cameraControl.handleResize();
+
+      let idleTimer = null;
+      let isIdle = false;
+      let idleFrameInterval = 1000 / IDLE_FPS;
+      let activeFrameInterval = 1000 / ACTIVE_FPS;
+      let frameInterval = activeFrameInterval;
+      let lastRenderTime = 0;
+
+      const markActive = () => {
+        isIdle = false;
+        frameInterval = activeFrameInterval;
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          isIdle = true;
+          frameInterval = idleFrameInterval;
+        }, IDLE_TIMEOUT_MS);
+      };
+
+      const interactionHandler = () => markActive();
+      container.addEventListener('pointerdown', interactionHandler);
+      container.addEventListener('pointermove', interactionHandler);
+
+      markActive();
+
       const handleResize = () => {
         const { width, height } = getContainerSize(container);
+        const size = scaler.setSize(width, height);
         const pixelRatio = getRenderPixelRatio();
         renderer.setPixelRatio(pixelRatio);
         composer.setPixelRatio(pixelRatio);
-        renderer.setSize(width, height);
-        composer.setSize(width, height);
-        uniforms.resolution.value.set(width, height);
+        uniforms.resolution.value.set(
+          renderer.domElement.width || size.width,
+          renderer.domElement.height || size.height,
+        );
         observer.aspect = width / height;
         observer.updateProjectionMatrix();
         cameraControl.handleResize();
       };
 
-      handleResize();
-
-      // Animation loop with adaptive frame rate limiting
-      const targetFPS = isMobile ? 24 : 30;
-      const frameInterval = 1000 / targetFPS;
-      let lastRenderTime = 0;
-      let skipFrames = 0;
+      let resizeTimer;
+      const debouncedResize = () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(handleResize, 150);
+      };
+      window.addEventListener('resize', debouncedResize);
 
       const animate = (frameTime) => {
-        if (disposed) {
-          return;
-        }
+        if (disposed) return;
 
-        // Frame rate limiting with adaptive skipping
         const elapsed = frameTime - lastRenderTime;
         if (elapsed < frameInterval) {
           animationId = requestAnimationFrame(animate);
           return;
         }
-        
-        // Skip every other frame when tab is not focused
-        if (!document.hasFocus()) {
-          skipFrames++;
-          if (skipFrames % 2 !== 0) {
-            animationId = requestAnimationFrame(animate);
-            return;
-          }
-        }
-        
+
         lastRenderTime = frameTime - (elapsed % frameInterval);
 
         if (lastFrameTime === undefined) {
           lastFrameTime = frameTime;
         }
-
         const delta = Math.min((frameTime - lastFrameTime) / 1000, 0.1);
         lastFrameTime = frameTime;
 
-        // Update camera
         observer.update(delta);
         cameraControl.update(delta);
 
-        // Update uniforms
         uniforms.time.value += delta;
         uniforms.fov.value = observer.fov;
 
-        // Render
         composer.render(delta);
+
+        if (!isIdle) {
+          const frameDuration = performance.now() - (lastRenderTime || performance.now());
+          scaler.reportFrame(Math.max(1, frameDuration));
+        }
 
         animationId = requestAnimationFrame(animate);
       };
 
-      window.addEventListener('resize', handleResize);
       animationId = requestAnimationFrame(animate);
 
-      // Visibility change handler - pause when tab is hidden
       const handleVisibilityChange = () => {
         if (document.hidden) {
           if (animationId) {
@@ -190,29 +210,35 @@ const BlackholeBackground = ({
         } else {
           if (!animationId) {
             lastRenderTime = 0;
+            lastFrameTime = undefined;
             animationId = requestAnimationFrame(animate);
           }
         }
       };
       document.addEventListener('visibilitychange', handleVisibilityChange);
 
-      // Store refs for cleanup
       blackholeRef.current = {
         renderer,
         scene,
         composer,
+        bloomPass,
         observer,
         cameraControl,
         textures,
-        handleResize,
+        scaler,
+        handleResize: debouncedResize,
         handleVisibilityChange,
         mesh,
+        cleanupInteraction: () => {
+          container.removeEventListener('pointerdown', interactionHandler);
+          container.removeEventListener('pointermove', interactionHandler);
+          clearTimeout(idleTimer);
+        },
       };
     };
 
     init();
 
-    // Cleanup
     return () => {
       disposed = true;
 
@@ -229,21 +255,22 @@ const BlackholeBackground = ({
           textures,
           handleResize,
           handleVisibilityChange,
+          scaler,
+          mesh,
         } = blackholeRef.current;
 
         window.removeEventListener('resize', handleResize);
-        document.removeEventListener(
-          'visibilitychange',
-          handleVisibilityChange,
-        );
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+        if (blackholeRef.current.cleanupInteraction) {
+          blackholeRef.current.cleanupInteraction();
+        }
         cameraControl.dispose();
 
-        // Dispose textures
         for (const texture of textures.values()) {
           if (texture) texture.dispose();
         }
 
-        // Dispose scene
         scene.traverse((object) => {
           if (object.geometry) object.geometry.dispose();
           if (object.material) {
@@ -255,7 +282,6 @@ const BlackholeBackground = ({
           }
         });
 
-        // Dispose renderer
         if (renderer.domElement && renderer.domElement.parentNode) {
           renderer.domElement.parentNode.removeChild(renderer.domElement);
         }
@@ -265,6 +291,7 @@ const BlackholeBackground = ({
 
       blackholeRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quality, enableBloom, bloomStrength, autoRotate]);
 
   return (

@@ -607,6 +607,18 @@ func (info *RelayInfo) AppendRequestConversion(format types.RelayFormat) {
 	info.RequestConversionChain = append(info.RequestConversionChain, format)
 }
 
+func (info *RelayInfo) ResetRequestConversionChain() {
+	if info == nil {
+		return
+	}
+	info.FinalRequestRelayFormat = ""
+	if info.RelayFormat == "" {
+		info.RequestConversionChain = nil
+		return
+	}
+	info.RequestConversionChain = []types.RelayFormat{info.RelayFormat}
+}
+
 func (info *RelayInfo) GetFinalRequestRelayFormat() types.RelayFormat {
 	if info == nil {
 		return ""
