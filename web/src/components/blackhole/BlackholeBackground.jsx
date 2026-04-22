@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   createRenderer,
@@ -8,12 +8,7 @@ import {
   createShaderProjectionPlane,
   getContainerSize,
   getRenderPixelRatio,
-  ResolutionScaler,
 } from './blackhole/render';
-
-const ACTIVE_FPS = 28;
-const IDLE_FPS = 10;
-const IDLE_TIMEOUT_MS = 3000;
 
 const BlackholeBackground = ({
   quality = 'medium',
@@ -23,9 +18,61 @@ const BlackholeBackground = ({
 }) => {
   const containerRef = useRef(null);
   const blackholeRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // IntersectionObserver: 只在元素进入视口时才开始加载和渲染
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsVisible(entry.isIntersecting);
+        });
+      },
+      { threshold: 0.01, rootMargin: '100px' }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  // 延迟初始化: 等主内容加载后再加载黑洞背景
+  useEffect(() => {
+    if (!isVisible || isInitialized) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    let disposed = false;
+    let initTimer;
+
+    const doInit = () => {
+      if (disposed) return;
+      setIsInitialized(true);
+    };
+
+    // 优先使用 requestIdleCallback，回退到 setTimeout
+    if (typeof window.requestIdleCallback === 'function') {
+      initTimer = window.requestIdleCallback(doInit, { timeout: 2000 });
+    } else {
+      initTimer = setTimeout(doInit, 300);
+    }
+
+    return () => {
+      disposed = true;
+      if (typeof window.requestIdleCallback === 'function') {
+        window.cancelIdleCallback(initTimer);
+      } else {
+        clearTimeout(initTimer);
+      }
+    };
+  }, [isVisible, isInitialized]);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!isInitialized || !containerRef.current) return;
 
     const container = containerRef.current;
     let animationId;
@@ -35,13 +82,19 @@ const BlackholeBackground = ({
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     );
-    const effectiveQuality = isMobile ? 'low' : quality;
-    const effectiveBloom = isMobile ? false : enableBloom;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    
+    // 如果用户偏好减少动画，禁用自动旋转并降低质量
+    const effectiveAutoRotate = prefersReducedMotion ? false : autoRotate;
+    const effectiveQuality = prefersReducedMotion ? 'low' : (isMobile ? 'low' : quality);
+    const effectiveBloom = prefersReducedMotion ? false : (isMobile ? false : enableBloom);
+    const targetFPS = prefersReducedMotion ? 15 : (isMobile ? 20 : 30);
+    const frameInterval = 1000 / targetFPS;
 
     const init = async () => {
       const renderer = createRenderer(container);
 
-      const { scene, composer, bloomPass } = createScene(renderer, {
+      const { scene, composer } = createScene(renderer, {
         enableBloom: effectiveBloom,
         bloomStrength,
       });
@@ -106,75 +159,44 @@ const BlackholeBackground = ({
       scene.add(mesh);
 
       observer.distance = 10.0;
-      observer.moving = autoRotate;
+      observer.moving = effectiveAutoRotate;
       observer.fov = 60.0;
       uniforms.fov.value = observer.fov;
 
-      const scaler = new ResolutionScaler(renderer, composer);
-      const { width: initW, height: initH } = getContainerSize(container);
-      const initSize = scaler.setSize(initW, initH);
-      uniforms.resolution.value.set(
-        renderer.domElement.width || initSize.width,
-        renderer.domElement.height || initSize.height,
-      );
-      observer.aspect = initW / initH;
-      observer.updateProjectionMatrix();
-      cameraControl.handleResize();
-
-      let idleTimer = null;
-      let isIdle = false;
-      let idleFrameInterval = 1000 / IDLE_FPS;
-      let activeFrameInterval = 1000 / ACTIVE_FPS;
-      let frameInterval = activeFrameInterval;
-      let lastRenderTime = 0;
-
-      const markActive = () => {
-        isIdle = false;
-        frameInterval = activeFrameInterval;
-        clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          isIdle = true;
-          frameInterval = idleFrameInterval;
-        }, IDLE_TIMEOUT_MS);
-      };
-
-      const interactionHandler = () => markActive();
-      container.addEventListener('pointerdown', interactionHandler);
-      container.addEventListener('pointermove', interactionHandler);
-
-      markActive();
-
       const handleResize = () => {
         const { width, height } = getContainerSize(container);
-        const size = scaler.setSize(width, height);
         const pixelRatio = getRenderPixelRatio();
         renderer.setPixelRatio(pixelRatio);
-        composer.setPixelRatio(pixelRatio);
-        uniforms.resolution.value.set(
-          renderer.domElement.width || size.width,
-          renderer.domElement.height || size.height,
-        );
+        renderer.setSize(width, height, false);
+        composer.setSize(width, height);
+        uniforms.resolution.value.set(width * pixelRatio, height * pixelRatio);
         observer.aspect = width / height;
         observer.updateProjectionMatrix();
         cameraControl.handleResize();
       };
 
-      let resizeTimer;
-      const debouncedResize = () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(handleResize, 150);
-      };
-      window.addEventListener('resize', debouncedResize);
+      handleResize();
+      window.addEventListener('resize', handleResize);
+
+      let lastRenderTime = 0;
+      // 每N帧更新一次observer uniforms，减少CPU->GPU传输
+      let frameCounter = 0;
+      const uniformUpdateInterval = 2; // 每2帧更新一次
 
       const animate = (frameTime) => {
         if (disposed) return;
+
+        // 页面不可见时停止渲染
+        if (document.hidden) {
+          animationId = requestAnimationFrame(animate);
+          return;
+        }
 
         const elapsed = frameTime - lastRenderTime;
         if (elapsed < frameInterval) {
           animationId = requestAnimationFrame(animate);
           return;
         }
-
         lastRenderTime = frameTime - (elapsed % frameInterval);
 
         if (lastFrameTime === undefined) {
@@ -187,14 +209,13 @@ const BlackholeBackground = ({
         cameraControl.update(delta);
 
         uniforms.time.value += delta;
-        uniforms.fov.value = observer.fov;
+        
+        frameCounter++;
+        if (frameCounter % uniformUpdateInterval === 0) {
+          uniforms.fov.value = observer.fov;
+        }
 
         composer.render(delta);
-
-        if (!isIdle) {
-          const frameDuration = performance.now() - (lastRenderTime || performance.now());
-          scaler.reportFrame(Math.max(1, frameDuration));
-        }
 
         animationId = requestAnimationFrame(animate);
       };
@@ -221,19 +242,12 @@ const BlackholeBackground = ({
         renderer,
         scene,
         composer,
-        bloomPass,
         observer,
         cameraControl,
         textures,
-        scaler,
-        handleResize: debouncedResize,
+        handleResize,
         handleVisibilityChange,
         mesh,
-        cleanupInteraction: () => {
-          container.removeEventListener('pointerdown', interactionHandler);
-          container.removeEventListener('pointermove', interactionHandler);
-          clearTimeout(idleTimer);
-        },
       };
     };
 
@@ -255,16 +269,10 @@ const BlackholeBackground = ({
           textures,
           handleResize,
           handleVisibilityChange,
-          scaler,
-          mesh,
         } = blackholeRef.current;
 
         window.removeEventListener('resize', handleResize);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
-
-        if (blackholeRef.current.cleanupInteraction) {
-          blackholeRef.current.cleanupInteraction();
-        }
         cameraControl.dispose();
 
         for (const texture of textures.values()) {
@@ -292,13 +300,13 @@ const BlackholeBackground = ({
       blackholeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quality, enableBloom, bloomStrength, autoRotate]);
+  }, [isInitialized, quality, enableBloom, bloomStrength, autoRotate]);
 
   return (
     <div
       ref={containerRef}
       className='absolute inset-0 w-full h-full'
-      style={{ zIndex: 0 }}
+      style={{ zIndex: 0, background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000000 100%)' }}
     />
   );
 };

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, Suspense } from 'react';
 import {
   Button,
   Typography,
@@ -40,7 +40,6 @@ import {
 } from '@douyinfe/semi-icons';
 import { Link } from 'react-router-dom';
 import NoticeModal from '../../components/layout/NoticeModal';
-import BlackholeBackground from '../../components/blackhole/BlackholeBackground';
 import {
   Moonshot,
   OpenAI,
@@ -63,6 +62,9 @@ import {
   Hunyuan,
   Xinference,
 } from '@lobehub/icons';
+
+// 懒加载黑洞背景组件，实现代码分割，减少首屏JS体积
+const BlackholeBackground = React.lazy(() => import('../../components/blackhole/BlackholeBackground'));
 
 const { Text } = Typography;
 
@@ -164,12 +166,14 @@ const Home = () => {
             style={{ minHeight: '100dvh' }}
           >
             {/* 黑洞背景 */}
-            <BlackholeBackground
-              quality={isMobile ? 'low' : 'medium'}
-              enableBloom={!isMobile}
-              bloomStrength={0.8}
-              autoRotate={true}
-            />
+            <Suspense fallback={<div className='absolute inset-0 w-full h-full' style={{ background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000000 100%)' }} />}>
+              <BlackholeBackground
+                quality={isMobile ? 'low' : 'medium'}
+                enableBloom={!isMobile}
+                bloomStrength={0.8}
+                autoRotate={true}
+              />
+            </Suspense>
 
             {/* 内容层 */}
             <div
