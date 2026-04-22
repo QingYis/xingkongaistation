@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import {
   createRenderer,
@@ -18,61 +18,9 @@ const BlackholeBackground = ({
 }) => {
   const containerRef = useRef(null);
   const blackholeRef = useRef(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // IntersectionObserver: 只在元素进入视口时才开始加载和渲染
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          setIsVisible(entry.isIntersecting);
-        });
-      },
-      { threshold: 0.01, rootMargin: '100px' }
-    );
-
-    observer.observe(container);
-    return () => observer.disconnect();
-  }, []);
-
-  // 延迟初始化: 等主内容加载后再加载黑洞背景
-  useEffect(() => {
-    if (!isVisible || isInitialized) return;
-
-    const container = containerRef.current;
-    if (!container) return;
-
-    let disposed = false;
-    let initTimer;
-
-    const doInit = () => {
-      if (disposed) return;
-      setIsInitialized(true);
-    };
-
-    // 优先使用 requestIdleCallback，回退到 setTimeout
-    if (typeof window.requestIdleCallback === 'function') {
-      initTimer = window.requestIdleCallback(doInit, { timeout: 2000 });
-    } else {
-      initTimer = setTimeout(doInit, 300);
-    }
-
-    return () => {
-      disposed = true;
-      if (typeof window.requestIdleCallback === 'function') {
-        window.cancelIdleCallback(initTimer);
-      } else {
-        clearTimeout(initTimer);
-      }
-    };
-  }, [isVisible, isInitialized]);
 
   useEffect(() => {
-    if (!isInitialized || !containerRef.current) return;
+    if (!containerRef.current) return;
 
     const container = containerRef.current;
     let animationId;
@@ -83,12 +31,9 @@ const BlackholeBackground = ({
       navigator.userAgent,
     );
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    
-    // 如果用户偏好减少动画，禁用自动旋转并降低质量
-    const effectiveAutoRotate = prefersReducedMotion ? false : autoRotate;
     const effectiveQuality = prefersReducedMotion ? 'low' : (isMobile ? 'low' : quality);
     const effectiveBloom = prefersReducedMotion ? false : (isMobile ? false : enableBloom);
-    const targetFPS = prefersReducedMotion ? 15 : (isMobile ? 20 : 30);
+    const targetFPS = isMobile ? 24 : 30;
     const frameInterval = 1000 / targetFPS;
 
     const init = async () => {
@@ -159,7 +104,7 @@ const BlackholeBackground = ({
       scene.add(mesh);
 
       observer.distance = 10.0;
-      observer.moving = effectiveAutoRotate;
+      observer.moving = prefersReducedMotion ? false : autoRotate;
       observer.fov = 60.0;
       uniforms.fov.value = observer.fov;
 
@@ -179,18 +124,9 @@ const BlackholeBackground = ({
       window.addEventListener('resize', handleResize);
 
       let lastRenderTime = 0;
-      // 每N帧更新一次observer uniforms，减少CPU->GPU传输
-      let frameCounter = 0;
-      const uniformUpdateInterval = 2; // 每2帧更新一次
 
       const animate = (frameTime) => {
         if (disposed) return;
-
-        // 页面不可见时停止渲染
-        if (document.hidden) {
-          animationId = requestAnimationFrame(animate);
-          return;
-        }
 
         const elapsed = frameTime - lastRenderTime;
         if (elapsed < frameInterval) {
@@ -209,11 +145,7 @@ const BlackholeBackground = ({
         cameraControl.update(delta);
 
         uniforms.time.value += delta;
-        
-        frameCounter++;
-        if (frameCounter % uniformUpdateInterval === 0) {
-          uniforms.fov.value = observer.fov;
-        }
+        uniforms.fov.value = observer.fov;
 
         composer.render(delta);
 
@@ -300,13 +232,13 @@ const BlackholeBackground = ({
       blackholeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInitialized, quality, enableBloom, bloomStrength, autoRotate]);
+  }, [quality, enableBloom, bloomStrength, autoRotate]);
 
   return (
     <div
       ref={containerRef}
       className='absolute inset-0 w-full h-full'
-      style={{ zIndex: 0, background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000000 100%)' }}
+      style={{ zIndex: 0 }}
     />
   );
 };

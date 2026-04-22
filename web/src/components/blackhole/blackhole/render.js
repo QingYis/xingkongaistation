@@ -9,7 +9,7 @@ import { Observer } from './Observer';
 import fragmentShader from './shaders/fragment.glsl?raw';
 import vertexShader from './shaders/vertex.glsl?raw';
 
-export const MAX_RENDER_PIXEL_RATIO = 1.0;
+export const MAX_RENDER_PIXEL_RATIO = 1.25;
 
 export function getContainerSize(container) {
   return {
@@ -23,8 +23,7 @@ export function getRenderPixelRatio(pixelRatioCap = MAX_RENDER_PIXEL_RATIO) {
     /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     );
-  const prefersReducedQuality = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const maxRatio = isMobile ? 0.75 : (prefersReducedQuality ? 0.75 : pixelRatioCap);
+  const maxRatio = isMobile ? 1.0 : pixelRatioCap;
   return Math.min(window.devicePixelRatio || 1, maxRatio);
 }
 
@@ -64,10 +63,10 @@ export function createScene(
   if (enableBloom) {
     const { width, height } = renderer.getSize(new THREE.Vector2());
     bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(Math.floor(width * 0.25), Math.floor(height * 0.25)),
+      new THREE.Vector2(Math.floor(width * 0.5), Math.floor(height * 0.5)),
       bloomStrength,
       1.5,
-      0.15,
+      0.1,
     );
     composer.addPass(bloomPass);
   }

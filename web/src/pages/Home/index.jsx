@@ -63,7 +63,6 @@ import {
   Xinference,
 } from '@lobehub/icons';
 
-// 懒加载黑洞背景组件，实现代码分割，减少首屏JS体积
 const BlackholeBackground = React.lazy(() => import('../../components/blackhole/BlackholeBackground'));
 
 const { Text } = Typography;
@@ -166,7 +165,7 @@ const Home = () => {
             style={{ minHeight: '100dvh' }}
           >
             {/* 黑洞背景 */}
-            <Suspense fallback={<div className='absolute inset-0 w-full h-full' style={{ background: 'radial-gradient(ellipse at center, #0a0a1a 0%, #000000 100%)' }} />}>
+            <Suspense fallback={null}>
               <BlackholeBackground
                 quality={isMobile ? 'low' : 'medium'}
                 enableBloom={!isMobile}
