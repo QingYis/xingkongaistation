@@ -57,32 +57,39 @@ vec3 lorentz_transform_velocity(vec3 u, vec3 v){
 vec3 temp_to_color(float temp_kelvin){
   vec3 color;
   temp_kelvin = clamp(temp_kelvin, 1000.0, 40000.0) / 100.0;
-  float t = temp_kelvin;
-  
-  if (t <= 66.0) {
-    color.r = 1.0;
-    color.g = max(0.0, min(1.0, (99.4708 * log(t) - 161.1196) / 255.0));
+  if (temp_kelvin <= 66.0){
+    color.r = 255.0;
+    color.g = temp_kelvin;
+    color.g = 99.4708025861 * log(color.g) - 161.1195681661;
+    if (color.g < 0.0) color.g = 0.0;
+    if (color.g > 255.0)  color.g = 255.0;
   } else {
-    float tr = max(0.0, t - 60.0);
-    color.r = min(1.0, 329.6987 * pow(tr, -0.1332) / 255.0);
-    float tg = max(0.0, t - 60.0);
-    color.g = min(1.0, 288.1222 * pow(tg, -0.0755) / 255.0);
+    color.r = temp_kelvin - 60.0;
+    if (color.r < 0.0) color.r = 0.0;
+    color.r = 329.698727446 * pow(color.r, -0.1332047592);
+    if (color.r < 0.0) color.r = 0.0;
+    if (color.g > 255.0) color.r = 255.0;
+    color.g = temp_kelvin - 60.0;
+    if (color.g < 0.0) color.g = 0.0;
+    color.g = 288.1221695283 * pow(color.g, -0.0755148492);
+    if (color.g > 255.0)  color.g = 255.0;  
   }
-  
-  if (t >= 66.0) {
-    color.b = 1.0;
-  } else if (t <= 19.0) {
+  if (temp_kelvin >= 66.0){
+    color.b = 255.0;
+  } else if (temp_kelvin <= 19.0){
     color.b = 0.0;
   } else {
-    float tb = t - 10.0;
-    color.b = max(0.0, min(1.0, (138.5177 * log(tb) - 305.0448) / 255.0));
+    color.b = temp_kelvin - 10.0;
+    color.b = 138.5177312231 * log(color.b) - 305.0447927307;
+    if (color.b < 0.0) color.b = 0.0;
+    if (color.b > 255.0) color.b = 255.0;
   }
-  
+  color /= 255.0;
   return color;
 }
 
 void main()	{
-  float uvfov = tan(fov * 0.5 * DEG_TO_RAD);
+  float uvfov = tan(fov / 2.0 * DEG_TO_RAD);
   vec2 uv = square_frame(resolution); 
 
   uv *= vec2(resolution.x/resolution.y, 1.0);
@@ -91,103 +98,101 @@ void main()	{
   vec3 nright = normalize(cross(forward, up));
   up = cross(nright, forward);
   
-  vec3 pixel_pos = cam_pos + forward + nright * uv.x * uvfov + up * uv.y * uvfov;
+  vec3 pixel_pos =cam_pos + forward + nright*uv.x*uvfov+ up*uv.y*uvfov;
   vec3 ray_dir = normalize(pixel_pos - cam_pos);
   
   if (lorentz_transform)
     ray_dir = lorentz_transform_velocity(ray_dir, cam_vel);
 
-  vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+  vec4 color = vec4(0.0,0.0,0.0,1.0);
 
   vec3 point = cam_pos;
   vec3 velocity = ray_dir;
-  vec3 c = cross(point, velocity);
-  float h2 = dot(c, c);
+  vec3 c = cross(point,velocity);
+  float h2 = dot(c,c);
 
-  float cam_vel_sq = dot(cam_vel, cam_vel);
-  float ray_gamma = 1.0 / sqrt(1.0 - cam_vel_sq);
-  float ray_doppler_factor = ray_gamma * (1.0 - dot(ray_dir, cam_vel));
+  float ray_gamma = 1.0/sqrt(1.0-dot(cam_vel,cam_vel));
+  float ray_doppler_factor = ray_gamma * (1.0 + dot(ray_dir, -cam_vel));
   float ray_intensity = 1.0;
   if (beaming)
-    ray_intensity = 1.0 / (ray_doppler_factor * ray_doppler_factor * ray_doppler_factor);
+    ray_intensity /= pow(ray_doppler_factor , 3.0);
   
   vec3 oldpoint; 
-  float dist = length(point);
-  float olddist;
+  float distance = length(point);
 
-  for (int i = 0; i < NSTEPS; i++) { 
+  for (int i=0; i<NSTEPS;i++){ 
     oldpoint = point;
-    olddist = dist;
     point += velocity * STEP;
-    float point_sq = dot(point, point);
-    vec3 accel = -1.5 * h2 * point / (point_sq * point_sq * sqrt(point_sq));
+    vec3 accel = -1.5 * h2 * point / pow(dot(point,point),2.5);
     velocity += accel * STEP;    
     
-    dist = length(point);
-    if (dist < 0.0) break;
+    distance = length(point);
+    if ( distance < 0.0) break;
     
-    if (dist < 1.0 && olddist > 1.0) {
-      color += vec4(0.0, 0.0, 0.0, 1.0);
+    bool horizon_mask = distance < 1.0 && length(oldpoint) > 1.0;
+    if (horizon_mask) {
+      vec4 black = vec4(0.0,0.0,0.0,1.0);
+      color += black;
       break;
     }
     
-    if (accretion_disk) {
-      if (oldpoint.y * point.y < 0.0) {
-        float lambda = -oldpoint.y / velocity.y;
-        vec3 intersection = oldpoint + lambda * velocity;
+    if (accretion_disk){
+      if (oldpoint.y * point.y < 0.0){
+        float lambda = - oldpoint.y/velocity.y;
+        vec3 intersection = oldpoint + lambda*velocity;
         float r = length(intersection);
-        if (r >= DISK_IN && r <= DISK_IN + DISK_WIDTH) {
-          float phi = atan(intersection.x, intersection.z) - time;
-          phi = mod(phi, PI * 2.0);
+        if (DISK_IN <= r&&r <= DISK_IN+DISK_WIDTH ){
+          float phi = atan(intersection.x, intersection.z);
           
-          vec3 disk_velocity = vec3(-intersection.x, 0.0, intersection.z) / (sqrt(2.0 * (r - 1.0)) * r * r); 
-          float disk_gamma = 1.0 / sqrt(1.0 - dot(disk_velocity, disk_velocity));
-          float disk_doppler_factor = disk_gamma * (1.0 + dot(ray_dir / dist, disk_velocity));
-          float doppler_combined = ray_doppler_factor * disk_doppler_factor;
+          vec3 disk_velocity = vec3(-intersection.x, 0.0, intersection.z)/sqrt(2.0*(r-1.0))/(r*r); 
+          phi -= time;
+          phi = mod(phi , PI*2.0);
+          float disk_gamma = 1.0/sqrt(1.0-dot(disk_velocity, disk_velocity));
+          float disk_doppler_factor = disk_gamma*(1.0+dot(ray_dir/distance, disk_velocity));
           
-          if (use_disk_texture) {
-            vec2 tex_coord = vec2(phi / (2.0 * PI), 1.0 - (r - DISK_IN) / DISK_WIDTH);
-            vec4 disk_color = texture2D(disk_texture, tex_coord) / doppler_combined;
-            float disk_alpha = clamp(dot(disk_color.rgb, disk_color.rgb) / 4.5, 0.0, 1.0);
+          if (use_disk_texture){
+            vec2 tex_coord = vec2(mod(phi,2.0*PI)/(2.0*PI),1.0-(r-DISK_IN)/(DISK_WIDTH));
+            vec4 disk_color = texture2D(disk_texture, tex_coord) / (ray_doppler_factor * disk_doppler_factor);
+            float disk_alpha = clamp(dot(disk_color,disk_color)/4.5,0.0,1.0);
 
             if (beaming)
-              disk_alpha /= (disk_doppler_factor * disk_doppler_factor * disk_doppler_factor);
+              disk_alpha /= pow(disk_doppler_factor,3.0);
             
-            color += disk_color * disk_alpha;
+            color += vec4(disk_color)*disk_alpha;
           } else {
-            float disk_temperature = 10000.0 * pow(r / DISK_IN, -0.75);
+            float disk_temperature = 10000.0*(pow(r/DISK_IN, -3.0/4.0));
             
             if (doppler_shift)
-              disk_temperature /= doppler_combined;
+              disk_temperature /= ray_doppler_factor*disk_doppler_factor;
 
             vec3 disk_color = temp_to_color(disk_temperature);
-            float disk_alpha = clamp(dot(disk_color, disk_color) / 3.0, 0.0, 1.0);
+            float disk_alpha = clamp(dot(disk_color,disk_color)/3.0,0.0,1.0);
             
             if (beaming)
-              disk_alpha /= (disk_doppler_factor * disk_doppler_factor * disk_doppler_factor);
+              disk_alpha /= pow(disk_doppler_factor,3.0);
             
-            color += vec4(disk_color, 1.0) * disk_alpha;
+            color += vec4(disk_color, 1.0)*disk_alpha;
           }
         }
       }
     }
   }
   
-  if (dist > 1.0) {
+  if (distance > 1.0){
     ray_dir = normalize(point - oldpoint);
     vec2 tex_coord = to_spherical(ray_dir * ROT_Z(45.0 * DEG_TO_RAD));
     vec4 star_color = texture2D(star_texture, tex_coord);
-    if (star_color.g > 0.0) {
-      float star_temperature = MIN_TEMPERATURE + TEMPERATURE_RANGE * star_color.r;
+    if (star_color.g > 0.0){
+      float star_temperature = (MIN_TEMPERATURE + TEMPERATURE_RANGE*star_color.r);
       float star_velocity = star_color.b - 0.5;
-      float star_doppler_factor = sqrt((1.0 + star_velocity) / (1.0 - star_velocity));
+      float star_doppler_factor = sqrt((1.0+star_velocity)/(1.0-star_velocity));
       if (doppler_shift)
-        star_temperature /= ray_doppler_factor * star_doppler_factor;
+        star_temperature /= ray_doppler_factor*star_doppler_factor;
       
-      color += vec4(temp_to_color(star_temperature), 1.0) * star_color.g;
+      color += vec4(temp_to_color(star_temperature),1.0)* star_color.g;
     }
 
     color += texture2D(bg_texture, tex_coord) * 0.25;
   }
-  gl_FragColor = color * ray_intensity;
+  gl_FragColor = color*ray_intensity;
 }
