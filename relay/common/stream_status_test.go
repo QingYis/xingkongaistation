@@ -135,7 +135,7 @@ func TestStreamStatus_IsNormalEnd(t *testing.T) {
 		normal bool
 	}{
 		{StreamEndReasonDone, true},
-		{StreamEndReasonEOF, true},
+		{StreamEndReasonEOF, false},
 		{StreamEndReasonHandlerStop, true},
 		{StreamEndReasonTimeout, false},
 		{StreamEndReasonClientGone, false},
@@ -155,6 +155,23 @@ func TestStreamStatus_IsNormalEnd_NilSafe(t *testing.T) {
 	t.Parallel()
 	var s *StreamStatus
 	assert.True(t, s.IsNormalEnd())
+}
+
+func TestStreamStatus_IsEOF(t *testing.T) {
+	t.Parallel()
+	s := NewStreamStatus()
+	s.SetEndReason(StreamEndReasonEOF, nil)
+	assert.True(t, s.IsEOF())
+
+	s2 := NewStreamStatus()
+	s2.SetEndReason(StreamEndReasonDone, nil)
+	assert.False(t, s2.IsEOF())
+}
+
+func TestStreamStatus_IsEOF_NilSafe(t *testing.T) {
+	t.Parallel()
+	var s *StreamStatus
+	assert.False(t, s.IsEOF())
 }
 
 func TestStreamStatus_Summary(t *testing.T) {

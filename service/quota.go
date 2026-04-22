@@ -347,6 +347,10 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		Other:            other,
 	})
 
+	if relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsEOF() && usage.CompletionTokens == 0 {
+		return errors.New("stream ended with EOF and completion tokens is 0, upstream connection may be broken")
+	}
+
 	if usage.CompletionTokens == 0 && totalTokens > 0 {
 		return errors.New("completion tokens is 0, request failed")
 	}

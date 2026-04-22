@@ -431,6 +431,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Other:            other,
 	})
 	
+	// 流式请求以EOF结束（未收到[DONE]终止标记）且输出token为0时，视为上游异常断连，触发重试
+	if relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsEOF() && summary.CompletionTokens == 0 {
+		return fmt.Errorf("stream ended with EOF and completion tokens is 0, upstream connection may be broken")
+	}
+
 	// 输出token为0时返回错误,触发重试
 	if summary.CompletionTokens == 0 && summary.TotalTokens > 0 {
 		return fmt.Errorf("completion tokens is 0, request failed")
