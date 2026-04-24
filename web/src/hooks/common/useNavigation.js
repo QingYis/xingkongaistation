@@ -25,13 +25,26 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
     const defaultModules = {
       home: true,
       console: true,
-      pricing: true,
+      pricing: {
+        enabled: true,
+        requireAuth: false,
+      },
       docs: true,
       about: true,
+      gptImage2: true,
     };
 
     // 使用传入的配置或默认配置
-    const modules = headerNavModules || defaultModules;
+    const modules = headerNavModules
+      ? {
+          ...defaultModules,
+          ...headerNavModules,
+          pricing:
+            typeof headerNavModules.pricing === 'undefined'
+              ? defaultModules.pricing
+              : headerNavModules.pricing,
+        }
+      : defaultModules;
 
     const allLinks = [
       {
@@ -53,6 +66,11 @@ export const useNavigation = (t, docsLink, headerNavModules) => {
         text: t('使用教程'),
         itemKey: 'about',
         to: '/about',
+      },
+      {
+        text: t('GPT image 2'),
+        itemKey: 'gptImage2',
+        to: '/gpt-image-2',
       },
     ];
 

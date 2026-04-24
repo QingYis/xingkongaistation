@@ -47,6 +47,7 @@ const OtherSetting = () => {
     Logo: '',
     Footer: '',
     About: '',
+    GPTImage2: '',
     HomePageContent: '',
   });
   let [loading, setLoading] = useState(false);
@@ -80,6 +81,7 @@ const OtherSetting = () => {
     Logo: false,
     HomePageContent: false,
     About: false,
+    GPTImage2: false,
     Footer: false,
     CheckUpdate: false,
   });
@@ -212,6 +214,25 @@ const OtherSetting = () => {
       showError('关于内容更新失败');
     } finally {
       setLoadingInput((loadingInput) => ({ ...loadingInput, About: false }));
+    }
+  };
+  // 个性化设置 - GPT image 2
+  const submitGPTImage2 = async () => {
+    try {
+      setLoadingInput((loadingInput) => ({
+        ...loadingInput,
+        GPTImage2: true,
+      }));
+      await updateOption('GPTImage2', inputs.GPTImage2);
+      showSuccess('GPT image 2 内容已更新');
+    } catch (error) {
+      console.error('GPT image 2 内容更新失败', error);
+      showError('GPT image 2 内容更新失败');
+    } finally {
+      setLoadingInput((loadingInput) => ({
+        ...loadingInput,
+        GPTImage2: false,
+      }));
     }
   };
   // 个性化设置 - 页脚
@@ -472,6 +493,22 @@ const OtherSetting = () => {
               />
               <Button onClick={submitAbout} loading={loadingInput['About']}>
                 {t('设置关于')}
+              </Button>
+              <Form.TextArea
+                label={t('GPT image 2')}
+                placeholder={t(
+                  '在此输入新的 GPT image 2 内容，支持 Markdown & HTML 代码。如果输入的是一个链接，则会使用该链接作为 iframe 的 src 属性，这允许你设置任意网页作为 GPT image 2 页面',
+                )}
+                field={'GPTImage2'}
+                onChange={handleInputChange}
+                style={{ fontFamily: 'JetBrains Mono, Consolas' }}
+                autosize={{ minRows: 6, maxRows: 12 }}
+              />
+              <Button
+                onClick={submitGPTImage2}
+                loading={loadingInput['GPTImage2']}
+              >
+                {t('设置 GPT image 2')}
               </Button>
               {/*  */}
               <Banner

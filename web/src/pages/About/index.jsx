@@ -33,14 +33,17 @@ const About = () => {
   const [aboutLoaded, setAboutLoaded] = useState(false);
   const currentYear = new Date().getFullYear();
 
+  const isExternalPageLink = (value) => /^https?:\/\//.test(value.trim());
+
   const displayAbout = async () => {
     setAbout(localStorage.getItem('about') || '');
     const res = await API.get('/api/about');
     const { success, message, data } = res.data;
     if (success) {
-      let aboutContent = data;
-      if (!data.startsWith('https://')) {
-        aboutContent = marked.parse(data);
+      const normalizedData = data.trim();
+      let aboutContent = normalizedData;
+      if (!isExternalPageLink(normalizedData)) {
+        aboutContent = marked.parse(normalizedData);
       }
       setAbout(aboutContent);
       localStorage.setItem('about', aboutContent);
@@ -153,9 +156,9 @@ const About = () => {
         </div>
       ) : (
         <>
-          {about.startsWith('https://') ? (
+          {isExternalPageLink(about) ? (
             <iframe
-              src={about}
+              src={about.trim()}
               style={{ width: '100%', height: '100vh', border: 'none' }}
             />
           ) : (

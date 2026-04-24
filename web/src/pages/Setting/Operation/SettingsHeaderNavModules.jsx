@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
   Button,
   Card,
@@ -33,29 +33,50 @@ import { StatusContext } from '../../../context/Status';
 
 const { Text } = Typography;
 
+const createDefaultHeaderNavModules = () => ({
+  home: true,
+  console: true,
+  pricing: {
+    enabled: true,
+    requireAuth: false,
+  },
+  docs: true,
+  about: true,
+  gptImage2: true,
+});
+
+const normalizeHeaderNavModules = (modules = {}) => {
+  const defaultModules = createDefaultHeaderNavModules();
+
+  return {
+    ...defaultModules,
+    ...modules,
+    pricing:
+      typeof modules.pricing === 'boolean'
+        ? {
+            enabled: modules.pricing,
+            requireAuth: false,
+          }
+        : {
+            ...defaultModules.pricing,
+            ...(modules.pricing || {}),
+          },
+  };
+};
+
 export default function SettingsHeaderNavModules(props) {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [statusState, statusDispatch] = useContext(StatusContext);
 
-  // 顶栏模块管理状态
-  const [headerNavModules, setHeaderNavModules] = useState({
-    home: true,
-    console: true,
-    pricing: {
-      enabled: true,
-      requireAuth: false, // 默认不需要登录鉴权
-    },
-    docs: true,
-    about: true,
-  });
+  const [headerNavModules, setHeaderNavModules] = useState(
+    createDefaultHeaderNavModules(),
+  );
 
-  // 处理顶栏模块配置变更
   function handleHeaderNavModuleChange(moduleKey) {
     return (checked) => {
       const newModules = { ...headerNavModules };
       if (moduleKey === 'pricing') {
-        // 对于pricing模块，只更新enabled属性
         newModules[moduleKey] = {
           ...newModules[moduleKey],
           enabled: checked,
@@ -67,7 +88,6 @@ export default function SettingsHeaderNavModules(props) {
     };
   }
 
-  // 处理模型广场权限控制变更
   function handlePricingAuthChange(checked) {
     const newModules = { ...headerNavModules };
     newModules.pricing = {
@@ -77,23 +97,11 @@ export default function SettingsHeaderNavModules(props) {
     setHeaderNavModules(newModules);
   }
 
-  // 重置顶栏模块为默认配置
   function resetHeaderNavModules() {
-    const defaultModules = {
-      home: true,
-      console: true,
-      pricing: {
-        enabled: true,
-        requireAuth: false,
-      },
-      docs: true,
-      about: true,
-    };
-    setHeaderNavModules(defaultModules);
+    setHeaderNavModules(createDefaultHeaderNavModules());
     showSuccess(t('已重置为默认配置'));
   }
 
-  // 保存配置
   async function onSubmit() {
     setLoading(true);
     try {
@@ -104,8 +112,6 @@ export default function SettingsHeaderNavModules(props) {
       const { success, message } = res.data;
       if (success) {
         showSuccess(t('保存成功'));
-
-        // 立即更新StatusContext中的状态
         statusDispatch({
           type: 'set',
           payload: {
@@ -114,7 +120,6 @@ export default function SettingsHeaderNavModules(props) {
           },
         });
 
-        // 刷新父组件状态
         if (props.refresh) {
           await props.refresh();
         }
@@ -129,38 +134,19 @@ export default function SettingsHeaderNavModules(props) {
   }
 
   useEffect(() => {
-    // 从 props.options 中获取配置
     if (props.options && props.options.HeaderNavModules) {
       try {
         const modules = JSON.parse(props.options.HeaderNavModules);
-
-        // 处理向后兼容性：如果pricing是boolean，转换为对象格式
-        if (typeof modules.pricing === 'boolean') {
-          modules.pricing = {
-            enabled: modules.pricing,
-            requireAuth: false, // 默认不需要登录鉴权
-          };
-        }
-
-        setHeaderNavModules(modules);
+        setHeaderNavModules(normalizeHeaderNavModules(modules));
       } catch (error) {
-        // 使用默认配置
-        const defaultModules = {
-          home: true,
-          console: true,
-          pricing: {
-            enabled: true,
-            requireAuth: false,
-          },
-          docs: true,
-          about: true,
-        };
-        setHeaderNavModules(defaultModules);
+        setHeaderNavModules(createDefaultHeaderNavModules());
       }
+      return;
     }
+
+    setHeaderNavModules(createDefaultHeaderNavModules());
   }, [props.options]);
 
-  // 模块配置数据
   const moduleConfigs = [
     {
       key: 'home',
@@ -176,7 +162,6 @@ export default function SettingsHeaderNavModules(props) {
       key: 'pricing',
       title: t('模型广场'),
       description: t('模型定价，需要登录访问'),
-      hasSubConfig: true, // 标识该模块有子配置
     },
     {
       key: 'docs',
@@ -187,6 +172,11 @@ export default function SettingsHeaderNavModules(props) {
       key: 'about',
       title: t('关于'),
       description: t('关于系统的详细信息'),
+    },
+    {
+      key: 'gptImage2',
+      title: t('GPT image 2'),
+      description: t('GPT image 2 页面入口'),
     },
   ];
 
@@ -255,11 +245,8 @@ export default function SettingsHeaderNavModules(props) {
                   </div>
                 </div>
 
-                {/* 为模型广场添加权限控制子开关 */}
                 {module.key === 'pricing' &&
-                  (module.key === 'pricing'
-                    ? headerNavModules[module.key]?.enabled
-                    : headerNavModules[module.key]) && (
+                  headerNavModules.pricing?.enabled && (
                     <div
                       style={{
                         borderTop: '1px solid var(--semi-color-border)',
@@ -300,9 +287,7 @@ export default function SettingsHeaderNavModules(props) {
                         </div>
                         <div style={{ marginLeft: '16px' }}>
                           <Switch
-                            checked={
-                              headerNavModules.pricing?.requireAuth || false
-                            }
+                            checked={headerNavModules.pricing?.requireAuth || false}
                             onChange={handlePricingAuthChange}
                             size='default'
                           />
