@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Source database (remote)
+# Source database (remote, read-only export)
 SRC_HOST="101.33.75.223"
 SRC_PORT="31812"
 SRC_DB="zeabur"
 SRC_USER="root"
 SRC_PASS="d2507Rf6Vcb4NI9BUKpkLejoY1EmwP83"
 
-# Target database (run this script on the Ubuntu target server)
+# Target PostgreSQL container / database
+PG_CONTAINER="1Panel-postgresql-Qt6y"
+PG_CLIENT_IMAGE="postgres:18-alpine"
 DST_HOST="127.0.0.1"
 DST_PORT="5432"
 DST_DB="newapi"
 DST_USER="user_rmzsQn"
 DST_PASS="password_bDWewb"
 
-DUMP_FILE="/tmp/zeabur.dump"
+HOST_DUMP_DIR="/tmp/pg-migrate"
+DUMP_FILE="/work/zeabur.dump"
 
 step() {
   echo
@@ -25,8 +28,6 @@ step() {
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "Missing command: $1" >&2
-    echo "Install PostgreSQL client tools first:" >&2
-    echo "  sudo apt update && sudo apt install -y postgresql-client" >&2
     exit 1
   fi
 }
@@ -40,13 +41,31 @@ cleanup() {
 }
 trap cleanup EXIT
 
-require_cmd psql
-require_cmd pg_dump
-require_cmd pg_restore
-require_cmd createdb
+run_client() {
+  docker run --rm \
+    --network "container:$PG_CONTAINER" \
+    -v "$HOST_DUMP_DIR:/work" \
+    "$@"
+}
 
-step "Check source database connection (read-only)"
-PGPASSWORD="$SRC_PASS" psql \
+require_cmd docker
+mkdir -p "$HOST_DUMP_DIR"
+
+if ! docker inspect "$PG_CONTAINER" >/dev/null 2>&1; then
+  echo "Container '$PG_CONTAINER' does not exist." >&2
+  exit 1
+fi
+
+if [[ "$(docker inspect -f '{{.State.Running}}' "$PG_CONTAINER")" != "true" ]]; then
+  echo "Container '$PG_CONTAINER' is not running." >&2
+  exit 1
+fi
+
+step "Check source database connection from temporary client container (read-only)"
+run_client \
+  -e PGPASSWORD="$SRC_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  psql \
   -h "$SRC_HOST" \
   -p "$SRC_PORT" \
   -U "$SRC_USER" \
@@ -54,8 +73,11 @@ PGPASSWORD="$SRC_PASS" psql \
   -v ON_ERROR_STOP=1 \
   -c "SELECT current_database(), current_user;"
 
-step "Check target database connection"
-PGPASSWORD="$DST_PASS" psql \
+step "Check target database connection through target container network"
+run_client \
+  -e PGPASSWORD="$DST_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  psql \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
@@ -64,19 +86,27 @@ PGPASSWORD="$DST_PASS" psql \
   -c "SELECT current_database(), current_user;"
 
 step "Check whether target database already exists"
-if PGPASSWORD="$DST_PASS" psql \
+DB_EXISTS="$(run_client \
+  -e PGPASSWORD="$DST_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  psql \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
   -d postgres \
-  -tAc "SELECT 1 FROM pg_database WHERE datname = '$DST_DB';" | grep -q '^1$'; then
+  -tAc "SELECT 1 FROM pg_database WHERE datname = '$DST_DB';" | tr -d '[:space:]')"
+
+if [[ "$DB_EXISTS" == "1" ]]; then
   echo "Target database '$DST_DB' already exists. Stop to avoid overwrite." >&2
   exit 1
 fi
 
-step "Export source database to local dump file"
-rm -f "$DUMP_FILE"
-PGPASSWORD="$SRC_PASS" pg_dump \
+step "Export source database to dump file via temporary client container"
+rm -f "$HOST_DUMP_DIR/zeabur.dump"
+run_client \
+  -e PGPASSWORD="$SRC_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  pg_dump \
   -h "$SRC_HOST" \
   -p "$SRC_PORT" \
   -U "$SRC_USER" \
@@ -86,20 +116,26 @@ PGPASSWORD="$SRC_PASS" pg_dump \
   --no-privileges \
   -f "$DUMP_FILE"
 
-if [[ ! -f "$DUMP_FILE" ]]; then
+if [[ ! -f "$HOST_DUMP_DIR/zeabur.dump" ]]; then
   echo "Export failed: dump file was not created." >&2
   exit 1
 fi
 
 step "Create target database"
-PGPASSWORD="$DST_PASS" createdb \
+run_client \
+  -e PGPASSWORD="$DST_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  createdb \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
   "$DST_DB"
 
 step "Restore data into target database"
-PGPASSWORD="$DST_PASS" pg_restore \
+run_client \
+  -e PGPASSWORD="$DST_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  pg_restore \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
@@ -111,7 +147,10 @@ PGPASSWORD="$DST_PASS" pg_restore \
   "$DUMP_FILE"
 
 step "Verify migrated tables"
-PGPASSWORD="$DST_PASS" psql \
+run_client \
+  -e PGPASSWORD="$DST_PASS" \
+  "$PG_CLIENT_IMAGE" \
+  psql \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
@@ -121,4 +160,4 @@ PGPASSWORD="$DST_PASS" psql \
 
 echo
 echo "Migration completed."
-echo "Source database was not modified. Local dump file: $DUMP_FILE"
+echo "Source database was not modified. Host dump file: $HOST_DUMP_DIR/zeabur.dump"
