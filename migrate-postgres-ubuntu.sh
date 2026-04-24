@@ -10,7 +10,6 @@ SRC_PASS="d2507Rf6Vcb4NI9BUKpkLejoY1EmwP83"
 
 # Target PostgreSQL container / database
 PG_CONTAINER="1Panel-postgresql-Qt6y"
-PG_CLIENT_IMAGE="postgres:18-alpine"
 DST_HOST="127.0.0.1"
 DST_PORT="5432"
 DST_DB="newapi"
@@ -58,6 +57,12 @@ fi
 
 if [[ "$(docker inspect -f '{{.State.Running}}' "$PG_CONTAINER")" != "true" ]]; then
   echo "Container '$PG_CONTAINER' is not running." >&2
+  exit 1
+fi
+
+PG_CLIENT_IMAGE="$(docker inspect -f '{{.Config.Image}}' "$PG_CONTAINER")"
+if [[ -z "$PG_CLIENT_IMAGE" || "$PG_CLIENT_IMAGE" == "<no value>" ]]; then
+  echo "Failed to resolve image for container '$PG_CONTAINER'." >&2
   exit 1
 fi
 
