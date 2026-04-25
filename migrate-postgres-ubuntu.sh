@@ -15,6 +15,7 @@ DST_PORT="5432"
 DST_DB="newapi"
 DST_USER="user_rmzsQn"
 DST_PASS="password_bDWewb"
+MAINT_DB="template1"
 
 HOST_DUMP_DIR="/tmp/pg-migrate"
 DUMP_FILE="/work/zeabur.dump"
@@ -86,7 +87,7 @@ run_client \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
-  -d postgres \
+  -d "$MAINT_DB" \
   -v ON_ERROR_STOP=1 \
   -c "SELECT current_database(), current_user;"
 
@@ -98,7 +99,7 @@ DB_EXISTS="$(run_client \
   -h "$DST_HOST" \
   -p "$DST_PORT" \
   -U "$DST_USER" \
-  -d postgres \
+  -d "$MAINT_DB" \
   -tAc "SELECT 1 FROM pg_database WHERE datname = '$DST_DB';" | tr -d '[:space:]')"
 
 if [[ "$DB_EXISTS" == "1" ]]; then

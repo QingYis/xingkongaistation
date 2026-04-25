@@ -27,9 +27,6 @@ import {
   REDEMPTION_ACTIONS,
 } from '../../../constants/redemption.constants';
 
-/**
- * Check if redemption code is expired
- */
 export const isExpired = (record) => {
   return (
     record.status === REDEMPTION_STATUS.UNUSED &&
@@ -38,16 +35,10 @@ export const isExpired = (record) => {
   );
 };
 
-/**
- * Render timestamp
- */
 const renderTimestamp = (timestamp) => {
   return <>{timestamp2string(timestamp)}</>;
 };
 
-/**
- * Render redemption code status
- */
 const renderStatus = (status, record, t) => {
   if (isExpired(record)) {
     return (
@@ -73,18 +64,53 @@ const renderStatus = (status, record, t) => {
   );
 };
 
-/**
- * Get redemption code table column definitions
- */
+const renderRewardType = (record, t) => {
+  const rewardType = record?.reward_type || 'quota';
+  if (rewardType === 'subscription') {
+    return (
+      <Space vertical spacing={4} align='start'>
+        <Tag color='purple' shape='circle'>
+          {t('订阅套餐')}
+        </Tag>
+        <span className='text-xs text-gray-500'>
+          {record?.plan_title || (record?.plan_id ? `#${record.plan_id}` : '-')}
+        </span>
+      </Space>
+    );
+  }
+  return (
+    <Tag color='grey' shape='circle'>
+      {t('额度')}
+    </Tag>
+  );
+};
+
+const renderRewardValue = (record, t) => {
+  const rewardType = record?.reward_type || 'quota';
+  if (rewardType === 'subscription') {
+    return (
+      <div>
+        <Tag color='violet' shape='circle'>
+          {record?.plan_title || (record?.plan_id ? `#${record.plan_id}` : t('未设置'))}
+        </Tag>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <Tag color='grey' shape='circle'>
+        {renderQuota(parseInt(record?.quota || 0, 10))}
+      </Tag>
+    </div>
+  );
+};
+
 export const getRedemptionsColumns = ({
   t,
   manageRedemption,
   copyText,
   setEditingRedemption,
   setShowEdit,
-  refresh,
-  redemptions,
-  activePage,
   showDeleteRedemptionModal,
 }) => {
   return [
@@ -105,17 +131,14 @@ export const getRedemptionsColumns = ({
       },
     },
     {
-      title: t('额度'),
-      dataIndex: 'quota',
-      render: (text) => {
-        return (
-          <div>
-            <Tag color='grey' shape='circle'>
-              {renderQuota(parseInt(text))}
-            </Tag>
-          </div>
-        );
-      },
+      title: t('奖励类型'),
+      key: 'reward_type',
+      render: (_, record) => renderRewardType(record, t),
+    },
+    {
+      title: t('奖励内容'),
+      key: 'reward_value',
+      render: (_, record) => renderRewardValue(record, t),
     },
     {
       title: t('创建时间'),
@@ -143,8 +166,7 @@ export const getRedemptionsColumns = ({
       dataIndex: 'operate',
       fixed: 'right',
       width: 205,
-      render: (text, record) => {
-        // Create dropdown menu items for more operations
+      render: (_, record) => {
         const moreMenuItems = [
           {
             node: 'item',

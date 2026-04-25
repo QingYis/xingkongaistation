@@ -13,9 +13,10 @@ $SrcPass = 'd2507Rf6Vcb4NI9BUKpkLejoY1EmwP83'
 
 $DstHost = '64.83.47.14'
 $DstPort = '5432'
-$DstDb   = 'newapi'         # Change to a new database name if needed, e.g. newapi_20260424
+$DstDb   = 'mynewapi'         # Change to a new database name if needed, e.g. newapi_20260424
 $DstUser = 'user_rmzsQn'
 $DstPass = 'password_bDWewb'
+$MaintDb = 'template1'
 
 $DumpFile = Join-Path (Get-Location) 'zeabur.dump'
 
@@ -58,7 +59,7 @@ Invoke-PgContainer -Image $DstDockerImage -Password $DstPass -Args @(
     '-h', $DstHost,
     '-p', $DstPort,
     '-U', $DstUser,
-    '-d', 'postgres',
+    '-d', $MaintDb,
     '-v', 'ON_ERROR_STOP=1',
     '-c', 'SELECT current_database(), current_user;'
 )
@@ -71,13 +72,33 @@ $dbExists = docker run --rm `
     -h $DstHost `
     -p $DstPort `
     -U $DstUser `
-    -d postgres `
+    -d $MaintDb `
     -tA `
     -v ON_ERROR_STOP=1 `
     -c "SELECT 1 FROM pg_database WHERE datname = '$DstDb';"
 
 if ($dbExists -eq '1') {
-    throw "Target database '$DstDb' already exists. To avoid overwrite, the script stopped. Change `$DstDb to a new database name and run again."
+    Write-Step "Drop existing target database"
+    docker run --rm `
+        -e "PGPASSWORD=$DstPass" `
+        $DstDockerImage `
+        psql `
+        -h $DstHost `
+        -p $DstPort `
+        -U $DstUser `
+        -d $MaintDb `
+        -v ON_ERROR_STOP=1 `
+        -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '$DstDb' AND pid <> pg_backend_pid();"
+
+    docker run --rm `
+        -e "PGPASSWORD=$DstPass" `
+        $DstDockerImage `
+        dropdb `
+        --if-exists `
+        -h $DstHost `
+        -p $DstPort `
+        -U $DstUser `
+        $DstDb
 }
 
 Write-Step "Export source database to local dump file"
@@ -104,6 +125,7 @@ if (-not (Test-Path $DumpFile)) {
 Write-Step "Create target database"
 Invoke-PgContainer -Image $DstDockerImage -Password $DstPass -Args @(
     'createdb',
+    '--maintenance-db', $MaintDb,
     '-h', $DstHost,
     '-p', $DstPort,
     '-U', $DstUser,

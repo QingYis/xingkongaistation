@@ -19,6 +19,7 @@ func GetAllRedemptions(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	fillRedemptionPlanTitles(redemptions)
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(redemptions)
 	common.ApiSuccess(c, pageInfo)
@@ -33,10 +34,68 @@ func SearchRedemptions(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	fillRedemptionPlanTitles(redemptions)
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(redemptions)
 	common.ApiSuccess(c, pageInfo)
 	return
+}
+
+func fillRedemptionPlanTitle(redemption *model.Redemption) {
+	if redemption == nil {
+		return
+	}
+	if model.NormalizeRedemptionRewardType(redemption.RewardType) != model.RedemptionRewardTypeSubscription || redemption.PlanId <= 0 {
+		redemption.PlanTitle = ""
+		return
+	}
+	plan, err := model.GetSubscriptionPlanById(redemption.PlanId)
+	if err != nil {
+		redemption.PlanTitle = ""
+		return
+	}
+	redemption.PlanTitle = plan.Title
+}
+
+func fillRedemptionPlanTitles(redemptions []*model.Redemption) {
+	for _, redemption := range redemptions {
+		fillRedemptionPlanTitle(redemption)
+	}
+}
+
+func validateRedemptionReward(c *gin.Context, redemption *model.Redemption, isEdit bool) bool {
+	if redemption == nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return false
+	}
+	redemption.RewardType = model.NormalizeRedemptionRewardType(redemption.RewardType)
+	if redemption.RewardType == model.RedemptionRewardTypeSubscription {
+		redemption.Quota = 0
+		if redemption.PlanId <= 0 {
+			common.ApiErrorMsg(c, "请选择订阅套餐")
+			return false
+		}
+		plan, err := model.GetSubscriptionPlanById(redemption.PlanId)
+		if err != nil {
+			common.ApiErrorMsg(c, "订阅套餐不存在")
+			return false
+		}
+		if !plan.Enabled {
+			common.ApiErrorMsg(c, "订阅套餐未启用")
+			return false
+		}
+		return true
+	}
+	redemption.PlanId = 0
+	if redemption.Quota <= 0 {
+		common.ApiErrorMsg(c, "请输入有效额度")
+		return false
+	}
+	if !isEdit && utf8.RuneCountInString(redemption.Name) == 0 {
+		common.ApiErrorI18n(c, i18n.MsgRedemptionNameLength)
+		return false
+	}
+	return true
 }
 
 func GetRedemption(c *gin.Context) {
@@ -50,6 +109,7 @@ func GetRedemption(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	fillRedemptionPlanTitle(redemption)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
@@ -77,6 +137,9 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountMax)
 		return
 	}
+	if !validateRedemptionReward(c, &redemption, false) {
+		return
+	}
 	if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 		return
@@ -89,7 +152,9 @@ func AddRedemption(c *gin.Context) {
 			Name:        redemption.Name,
 			Key:         key,
 			CreatedTime: common.GetTimestamp(),
+			RewardType:  redemption.RewardType,
 			Quota:       redemption.Quota,
+			PlanId:      redemption.PlanId,
 			ExpiredTime: redemption.ExpiredTime,
 		}
 		err = cleanRedemption.Insert()
@@ -144,9 +209,13 @@ func UpdateRedemption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 			return
 		}
-		// If you add more fields, please also update redemption.Update()
+		if !validateRedemptionReward(c, &redemption, true) {
+			return
+		}
 		cleanRedemption.Name = redemption.Name
+		cleanRedemption.RewardType = redemption.RewardType
 		cleanRedemption.Quota = redemption.Quota
+		cleanRedemption.PlanId = redemption.PlanId
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
 	}
 	if statusOnly != "" {
@@ -157,6 +226,7 @@ func UpdateRedemption(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	fillRedemptionPlanTitle(cleanRedemption)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
