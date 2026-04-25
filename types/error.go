@@ -92,6 +92,7 @@ type NewAPIError struct {
 	Err            error
 	RelayError     any
 	skipRetry      bool
+	noRefund       bool
 	recordErrorLog *bool
 	errorType      ErrorType
 	errorCode      ErrorCode
@@ -379,9 +380,23 @@ func IsSkipRetryError(err *NewAPIError) bool {
 	return err.skipRetry
 }
 
+func IsNoRefundError(err *NewAPIError) bool {
+	if err == nil {
+		return false
+	}
+
+	return err.noRefund
+}
+
 func ErrOptionWithSkipRetry() NewAPIErrorOptions {
 	return func(e *NewAPIError) {
 		e.skipRetry = true
+	}
+}
+
+func ErrOptionWithNoRefund() NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.noRefund = true
 	}
 }
 

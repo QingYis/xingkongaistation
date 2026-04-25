@@ -170,7 +170,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		// Only return quota if downstream failed and quota was actually pre-consumed
 		if newAPIError != nil {
 			newAPIError = service.NormalizeViolationFeeError(newAPIError)
-			if relayInfo.Billing != nil {
+			if relayInfo.Billing != nil && !types.IsNoRefundError(newAPIError) {
 				relayInfo.Billing.Refund(c)
 			}
 			service.ChargeViolationFeeIfNeeded(c, relayInfo, newAPIError)
@@ -231,8 +231,16 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError)
 
-		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
+		retryNeeded := shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
+		if !retryNeeded {
 			break
+		}
+		if types.IsNoRefundError(newAPIError) && !priceData.FreeModel {
+			if preConsumeErr := service.PreConsumeBilling(c, priceData.QuotaToPreConsume, relayInfo); preConsumeErr != nil {
+				logger.LogError(c, preConsumeErr.Error())
+				newAPIError = preConsumeErr
+				break
+			}
 		}
 		if common.ChannelSmartRoutingEnabled && relayInfo.RelayFormat != "" {
 			common.SetContextKey(c, constant.ContextKeyChannelSmartRoutingUseConventional, true)

@@ -208,11 +208,10 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		logContent += fmt.Sprintf("（可能是上游超时）")
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, modelName, relayInfo.FinalPreConsumedQuota))
-	} else if textOutTokens == 0 {
-		// 输出token为0时，不扣取任何费用
-		quota = 0
-		logContent += fmt.Sprintf("（输出token为0，不扣费）")
 	} else {
+		if textOutTokens == 0 {
+			logContent += fmt.Sprintf("（输出token为0，按系统计价正常扣费）")
+		}
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
@@ -314,16 +313,16 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
 			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, relayInfo.OriginModelName, relayInfo.FinalPreConsumedQuota))
 	} else if usage.CompletionTokens == 0 {
-		// 输出token为0时，不扣取任何费用
-		quota = 0
-		logContent += fmt.Sprintf("（输出token为0，不扣费）")
-	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
-		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
+		logContent += fmt.Sprintf("（输出token为0，按系统计价正常扣费）")
 	}
 
 	if err := SettleBilling(ctx, relayInfo, quota); err != nil {
-		logger.LogError(ctx, "error settling billing: "+err.Error())
+		return types.NewError(err, types.ErrorCodeQuotaConsumeFailed)
+	}
+
+	if totalTokens > 0 {
+		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
+		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
 	logModel := relayInfo.OriginModelName
@@ -348,11 +347,20 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	})
 
 	if relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsEOF() && usage.CompletionTokens == 0 {
-		return errors.New("stream ended with EOF and completion tokens is 0, upstream connection may be broken")
+		logger.LogWarn(ctx, "stream ended with EOF and completion tokens is 0, settled billing with current usage")
+		return types.NewError(
+			errors.New("stream ended with EOF and completion tokens is 0, upstream connection may be broken"),
+			types.ErrorCodeQuotaConsumeFailed,
+			types.ErrOptionWithNoRefund(),
+		)
 	}
 
 	if usage.CompletionTokens == 0 && totalTokens > 0 {
-		return errors.New("completion tokens is 0, request failed")
+		return types.NewError(
+			errors.New("completion tokens is 0, request failed"),
+			types.ErrorCodeQuotaConsumeFailed,
+			types.ErrOptionWithNoRefund(),
+		)
 	}
 
 	return nil

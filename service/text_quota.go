@@ -274,9 +274,6 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 
 	if summary.TotalTokens == 0 {
 		summary.Quota = 0
-	} else if summary.CompletionTokens == 0 {
-		// 输出token为0时，不扣取任何费用
-		summary.Quota = 0
 	} else if !ratio.IsZero() && summary.Quota == 0 {
 		summary.Quota = 1
 	}
@@ -309,6 +306,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if summary.WebSearchCallCount > 0 {
 		extraContent = append(extraContent, fmt.Sprintf("Web Search 调用 %d 次，调用花费 %s", summary.WebSearchCallCount, decimal.NewFromFloat(summary.WebSearchPrice).Mul(decimal.NewFromInt(int64(summary.WebSearchCallCount))).Div(decimal.NewFromInt(1000)).Mul(decimal.NewFromFloat(summary.GroupRatio)).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).String()))
 	}
+	if summary.CompletionTokens == 0 && summary.TotalTokens > 0 {
+		extraContent = append(extraContent, "输出 token 为 0，按系统计价正常扣费")
+	}
 	if summary.ClaudeWebSearchCallCount > 0 {
 		extraContent = append(extraContent, fmt.Sprintf("Claude Web Search 调用 %d 次，调用花费 %s", summary.ClaudeWebSearchCallCount, decimal.NewFromFloat(summary.ClaudeWebSearchPrice).Div(decimal.NewFromInt(1000)).Mul(decimal.NewFromFloat(summary.GroupRatio)).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).Mul(decimal.NewFromInt(int64(summary.ClaudeWebSearchCallCount))).String()))
 	}
@@ -325,13 +325,15 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if summary.TotalTokens == 0 {
 		extraContent = append(extraContent, "上游没有返回计费信息，无法扣费（可能是上游超时）")
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, summary.ModelName, relayInfo.FinalPreConsumedQuota))
-	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
-		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
 	}
 
 	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
-		logger.LogError(ctx, "error settling billing: "+err.Error())
+		return types.NewError(err, types.ErrorCodeQuotaConsumeFailed)
+	}
+
+	if summary.TotalTokens > 0 {
+		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
+		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
 	}
 
 	logModel := summary.ModelName
@@ -431,14 +433,23 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Other:            other,
 	})
 	
-	// 流式请求以EOF结束（未收到[DONE]终止标记）且输出token为0时，视为上游异常断连，触发重试
+	// 流式请求以EOF结束（未收到[DONE]终止标记）且输出token为0时，按已有 usage 完成计费后仍返回错误触发重试
 	if relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsEOF() && summary.CompletionTokens == 0 {
-		return fmt.Errorf("stream ended with EOF and completion tokens is 0, upstream connection may be broken")
+		logger.LogWarn(ctx, "stream ended with EOF and completion tokens is 0, settled billing with current usage")
+		return types.NewError(
+			fmt.Errorf("stream ended with EOF and completion tokens is 0, upstream connection may be broken"),
+			types.ErrorCodeQuotaConsumeFailed,
+			types.ErrOptionWithNoRefund(),
+		)
 	}
 
-	// 输出token为0时返回错误,触发重试
+	// 输出token为0时，按系统计价完成扣费后仍返回错误触发重试
 	if summary.CompletionTokens == 0 && summary.TotalTokens > 0 {
-		return fmt.Errorf("completion tokens is 0, request failed")
+		return types.NewError(
+			fmt.Errorf("completion tokens is 0, request failed"),
+			types.ErrorCodeQuotaConsumeFailed,
+			types.ErrOptionWithNoRefund(),
+		)
 	}
 	
 	return nil
