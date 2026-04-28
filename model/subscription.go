@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -268,6 +269,14 @@ func (s *UserSubscription) BeforeUpdate(tx *gorm.DB) error {
 
 type SubscriptionSummary struct {
 	Subscription *UserSubscription `json:"subscription"`
+}
+
+type SubscriptionUsageSummary struct {
+	UsageRate         float64 `json:"usage_rate"`
+	UsedAmount        int64   `json:"used_amount"`
+	TotalAmount       int64   `json:"total_amount"`
+	SubscriptionCount int64   `json:"subscription_count"`
+	Available         bool    `json:"available"`
 }
 
 func calcPlanEndTime(start time.Time, plan *SubscriptionPlan) (int64, error) {
@@ -651,6 +660,110 @@ func AdminBindSubscription(userId int, planId int, sourceNote string) (string, e
 }
 
 // GetAllActiveUserSubscriptions returns all active subscriptions for a user.
+func GetSubscriptionUsageSummaryByRange(startTimestamp, endTimestamp int64) (SubscriptionUsageSummary, error) {
+	summary := SubscriptionUsageSummary{}
+	if startTimestamp <= 0 || endTimestamp <= 0 || endTimestamp < startTimestamp {
+		return summary, nil
+	}
+
+	var subs []UserSubscription
+	err := DB.Select("id, amount_total, start_time, end_time").
+		Where("status = ? AND amount_total > ? AND start_time <= ? AND end_time >= ?", "active", 0, endTimestamp, startTimestamp).
+		Find(&subs).Error
+	if err != nil {
+		return summary, err
+	}
+
+	for _, sub := range subs {
+		summary.TotalAmount += sub.AmountTotal
+	}
+	summary.SubscriptionCount = int64(len(subs))
+
+	if summary.TotalAmount <= 0 {
+		return summary, nil
+	}
+
+	type subscriptionConsumeLog struct {
+		Quota int    `gorm:"column:quota"`
+		Other string `gorm:"column:other"`
+	}
+
+	var logs []subscriptionConsumeLog
+	err = LOG_DB.Model(&Log{}).
+		Select("quota, other").
+		Where("created_at >= ? AND created_at <= ? AND type = ?", startTimestamp, endTimestamp, LogTypeConsume).
+		Find(&logs).Error
+	if err != nil {
+		return summary, err
+	}
+
+	for _, logItem := range logs {
+		if logItem.Other == "" {
+			continue
+		}
+		var otherMap map[string]interface{}
+		if err := common.UnmarshalJsonStr(logItem.Other, &otherMap); err != nil {
+			continue
+		}
+		billingSource, _ := otherMap["billing_source"].(string)
+		if billingSource != "subscription" {
+			continue
+		}
+		if consumed, ok := getInt64FromAny(otherMap["subscription_consumed"]); ok {
+			summary.UsedAmount += consumed
+			continue
+		}
+		summary.UsedAmount += int64(logItem.Quota)
+	}
+
+	summary.Available = true
+	if summary.UsedAmount > 0 {
+		summary.UsageRate = float64(summary.UsedAmount) / float64(summary.TotalAmount)
+	}
+	return summary, nil
+}
+
+func getInt64FromAny(v interface{}) (int64, bool) {
+	switch value := v.(type) {
+	case float64:
+		return int64(value), true
+	case float32:
+		return int64(value), true
+	case int:
+		return int64(value), true
+	case int8:
+		return int64(value), true
+	case int16:
+		return int64(value), true
+	case int32:
+		return int64(value), true
+	case int64:
+		return value, true
+	case uint:
+		return int64(value), true
+	case uint8:
+		return int64(value), true
+	case uint16:
+		return int64(value), true
+	case uint32:
+		return int64(value), true
+	case uint64:
+		return int64(value), true
+	case json.Number:
+		i, err := value.Int64()
+		if err == nil {
+			return i, true
+		}
+		f, err := value.Float64()
+		if err == nil {
+			return int64(f), true
+		}
+		return 0, false
+	default:
+		return 0, false
+	}
+}
+
 func GetAllActiveUserSubscriptions(userId int) ([]SubscriptionSummary, error) {
 	if userId <= 0 {
 		return nil, errors.New("invalid userId")

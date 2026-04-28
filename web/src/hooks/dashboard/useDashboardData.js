@@ -57,6 +57,8 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const [consumeQuota, setConsumeQuota] = useState(0);
   const [consumeTokens, setConsumeTokens] = useState(0);
   const [times, setTimes] = useState(0);
+  const [subscriptionUsageSummary, setSubscriptionUsageSummary] =
+    useState(null);
   const [pieData, setPieData] = useState([{ type: 'null', value: '0' }]);
   const [lineData, setLineData] = useState([]);
   const [modelColors, setModelColors] = useState({});
@@ -171,9 +173,12 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
       }
 
       const res = await API.get(url);
-      const { success, message, data } = res.data;
+      const { success, message, data, subscription_usage_summary } = res.data;
       if (success) {
         setQuotaData(data);
+        setSubscriptionUsageSummary(
+          isAdminUser ? subscription_usage_summary || null : null,
+        );
         if (data.length === 0) {
           data.push({
             count: 0,
@@ -294,6 +299,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     setConsumeTokens,
     times,
     setTimes,
+    subscriptionUsageSummary,
     pieData,
     setPieData,
     lineData,

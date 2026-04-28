@@ -41,7 +41,19 @@ export const useDashboardStats = (
   performanceMetrics,
   navigate,
   t,
+  isAdminUser,
+  subscriptionUsageSummary,
 ) => {
+  const subscriptionUsageValue = useMemo(() => {
+    if (!isAdminUser) {
+      return null;
+    }
+    if (!subscriptionUsageSummary?.available) {
+      return '--';
+    }
+    return `${(subscriptionUsageSummary.usage_rate * 100).toFixed(2)}%`;
+  }, [isAdminUser, subscriptionUsageSummary]);
+
   const groupedStatsData = useMemo(
     () => [
       {
@@ -108,6 +120,18 @@ export const useDashboardStats = (
             trendData: trendData.tokens,
             trendColor: '#ec4899',
           },
+          ...(isAdminUser
+            ? [
+                {
+                  title: t('订阅额度使用率'),
+                  value: subscriptionUsageValue,
+                  icon: <IconHistogram />,
+                  avatarColor: 'orange',
+                  trendData: [],
+                  trendColor: '#fb923c',
+                },
+              ]
+            : []),
         ],
       },
       {
@@ -144,6 +168,8 @@ export const useDashboardStats = (
       performanceMetrics,
       navigate,
       t,
+      isAdminUser,
+      subscriptionUsageValue,
     ],
   );
 

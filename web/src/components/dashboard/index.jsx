@@ -83,6 +83,8 @@ const Dashboard = () => {
     dashboardData.performanceMetrics,
     dashboardData.navigate,
     dashboardData.t,
+    dashboardData.isAdminUser,
+    dashboardData.subscriptionUsageSummary,
   );
 
   // ========== 数据处理 ==========
