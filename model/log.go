@@ -463,7 +463,7 @@ func populateChannelNames(stats []ChannelProfitStatItem) error {
 	return nil
 }
 
-func GetAdminLogProfitStat(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
+func buildAdminLogProfitBaseQuery(startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (*gorm.DB, error) {
 	tx := LOG_DB.Table("logs")
 	if username != "" {
 		tx = tx.Where("username = ?", username)
@@ -480,7 +480,7 @@ func GetAdminLogProfitStat(logType int, startTimestamp int64, endTimestamp int64
 	if modelName != "" {
 		modelNamePattern, filterErr := sanitizeLikePattern(modelName)
 		if filterErr != nil {
-			return stat, filterErr
+			return nil, filterErr
 		}
 		tx = tx.Where("model_name LIKE ? ESCAPE '!'", modelNamePattern)
 	}
@@ -491,6 +491,14 @@ func GetAdminLogProfitStat(logType int, startTimestamp int64, endTimestamp int64
 		tx = tx.Where(logGroupCol+" = ?", group)
 	}
 	tx = tx.Where("type = ?", LogTypeConsume)
+	return tx, nil
+}
+
+func GetAdminLogProfitSummary(startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
+	tx, err := buildAdminLogProfitBaseQuery(startTimestamp, endTimestamp, modelName, username, tokenName, channel, group)
+	if err != nil {
+		return stat, err
+	}
 
 	type statRow struct {
 		Quota             int64 `gorm:"column:quota"`
@@ -500,8 +508,41 @@ func GetAdminLogProfitStat(logType int, startTimestamp int64, endTimestamp int64
 	}
 	var statResult statRow
 	if err := tx.Select("COALESCE(SUM(quota), 0) AS quota, COALESCE(SUM(upstream_cost_quota), 0) AS upstream_cost_quota, COALESCE(SUM(CASE WHEN upstream_cost_source <> ? THEN 1 ELSE 0 END), 0) AS known_cost_count, COUNT(*) AS total_consume_count", UpstreamCostSourceUnknown).Scan(&statResult).Error; err != nil {
-		common.SysError("failed to query admin log profit stat: " + err.Error())
+		common.SysError("failed to query admin log profit summary: " + err.Error())
 		return stat, errors.New("查询统计数据失败")
+	}
+
+	stat.Quota = statResult.Quota
+	stat.UpstreamCostQuota = statResult.UpstreamCostQuota
+	stat.ProfitQuota = stat.Quota - stat.UpstreamCostQuota
+	stat.KnownCostCount = statResult.KnownCostCount
+	stat.TotalConsumeCount = statResult.TotalConsumeCount
+	if stat.TotalConsumeCount > 0 {
+		stat.CostCoverageRate = float64(stat.KnownCostCount) / float64(stat.TotalConsumeCount)
+	}
+
+	var channelRows []ChannelProfitStatItem
+	if err := tx.Select("channel_id, COALESCE(SUM(quota), 0) AS quota, COALESCE(SUM(upstream_cost_quota), 0) AS upstream_cost_quota, COUNT(*) AS request_count, COALESCE(SUM(CASE WHEN upstream_cost_source <> ? THEN 1 ELSE 0 END), 0) AS known_cost_count", UpstreamCostSourceUnknown).Group("channel_id").Order("quota DESC").Scan(&channelRows).Error; err != nil {
+		common.SysError("failed to query channel profit summary: " + err.Error())
+		return stat, errors.New("查询统计数据失败")
+	}
+	for i := range channelRows {
+		channelRows[i].ProfitQuota = channelRows[i].Quota - channelRows[i].UpstreamCostQuota
+		if channelRows[i].RequestCount > 0 {
+			channelRows[i].CostCoverageRate = float64(channelRows[i].KnownCostCount) / float64(channelRows[i].RequestCount)
+		}
+	}
+	if err := populateChannelNames(channelRows); err != nil {
+		return stat, err
+	}
+	stat.Channels = channelRows
+	return stat, nil
+}
+
+func GetAdminLogProfitStat(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
+	stat, err = GetAdminLogProfitSummary(startTimestamp, endTimestamp, modelName, username, tokenName, channel, group)
+	if err != nil {
+		return stat, err
 	}
 
 	rpmQuery := LOG_DB.Table("logs").Select("COUNT(*) AS rpm, COALESCE(SUM(prompt_tokens), 0) + COALESCE(SUM(completion_tokens), 0) AS tpm")
@@ -530,31 +571,6 @@ func GetAdminLogProfitStat(logType int, startTimestamp int64, endTimestamp int64
 		common.SysError("failed to query admin log rpm/tpm stat: " + err.Error())
 		return stat, errors.New("查询统计数据失败")
 	}
-
-	stat.Quota = statResult.Quota
-	stat.UpstreamCostQuota = statResult.UpstreamCostQuota
-	stat.ProfitQuota = stat.Quota - stat.UpstreamCostQuota
-	stat.KnownCostCount = statResult.KnownCostCount
-	stat.TotalConsumeCount = statResult.TotalConsumeCount
-	if stat.TotalConsumeCount > 0 {
-		stat.CostCoverageRate = float64(stat.KnownCostCount) / float64(stat.TotalConsumeCount)
-	}
-
-	var channelRows []ChannelProfitStatItem
-	if err := tx.Select("channel_id, COALESCE(SUM(quota), 0) AS quota, COALESCE(SUM(upstream_cost_quota), 0) AS upstream_cost_quota, COUNT(*) AS request_count, COALESCE(SUM(CASE WHEN upstream_cost_source <> ? THEN 1 ELSE 0 END), 0) AS known_cost_count", UpstreamCostSourceUnknown).Group("channel_id").Order("quota DESC").Scan(&channelRows).Error; err != nil {
-		common.SysError("failed to query channel profit stat: " + err.Error())
-		return stat, errors.New("查询统计数据失败")
-	}
-	for i := range channelRows {
-		channelRows[i].ProfitQuota = channelRows[i].Quota - channelRows[i].UpstreamCostQuota
-		if channelRows[i].RequestCount > 0 {
-			channelRows[i].CostCoverageRate = float64(channelRows[i].KnownCostCount) / float64(channelRows[i].RequestCount)
-		}
-	}
-	if err := populateChannelNames(channelRows); err != nil {
-		return stat, err
-	}
-	stat.Channels = channelRows
 	return stat, nil
 }
 

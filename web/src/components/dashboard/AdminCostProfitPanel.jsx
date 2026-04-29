@@ -35,6 +35,9 @@ const AdminCostProfitPanel = ({
     return null;
   }
 
+  const channels = stat?.channels || [];
+  const hasData = (stat?.total_consume_count || 0) > 0 || channels.length > 0;
+
   const columns = [
     {
       title: t('渠道'),
@@ -75,51 +78,62 @@ const AdminCostProfitPanel = ({
         title={t('渠道成本与利润')}
         className='!rounded-2xl'
       >
-        <div className='flex flex-wrap gap-3 mb-3'>
-          <div className='px-4 py-3 rounded-xl bg-blue-50'>
-            <div className='text-xs text-gray-500'>{t('收入')}</div>
-            <div className='font-semibold'>{formatQuotaAsUsd(stat?.quota || 0)}</div>
-          </div>
-          <div className='px-4 py-3 rounded-xl bg-orange-50'>
-            <div className='text-xs text-gray-500'>{t('上游成本')}</div>
-            <div className='font-semibold'>
-              {formatQuotaAsUsd(stat?.upstream_cost_quota || 0)}
+        {!hasData && !loading ? (
+          <Empty
+            title={t('暂无渠道成本数据')}
+            description={t('当前筛选范围内没有可用于成本与利润统计的请求记录')}
+          />
+        ) : (
+          <>
+            <div className='flex flex-wrap gap-3 mb-3'>
+              <div className='px-4 py-3 rounded-xl bg-blue-50'>
+                <div className='text-xs text-gray-500'>{t('收入')}</div>
+                <div className='font-semibold'>
+                  {formatQuotaAsUsd(stat?.quota || 0)}
+                </div>
+              </div>
+              <div className='px-4 py-3 rounded-xl bg-orange-50'>
+                <div className='text-xs text-gray-500'>{t('上游成本')}</div>
+                <div className='font-semibold'>
+                  {formatQuotaAsUsd(stat?.upstream_cost_quota || 0)}
+                </div>
+              </div>
+              <div className='px-4 py-3 rounded-xl bg-green-50'>
+                <div className='text-xs text-gray-500'>{t('利润')}</div>
+                <div className='font-semibold'>
+                  {formatQuotaAsUsd(stat?.profit_quota || 0)}
+                </div>
+              </div>
+              <div className='px-4 py-3 rounded-xl bg-gray-50'>
+                <div className='text-xs text-gray-500'>{t('成本覆盖率')}</div>
+                <div className='font-semibold'>
+                  {formatCoverageRate(stat?.cost_coverage_rate || 0)}
+                </div>
+              </div>
             </div>
-          </div>
-          <div className='px-4 py-3 rounded-xl bg-green-50'>
-            <div className='text-xs text-gray-500'>{t('利润')}</div>
-            <div className='font-semibold'>
-              {formatQuotaAsUsd(stat?.profit_quota || 0)}
-            </div>
-          </div>
-          <div className='px-4 py-3 rounded-xl bg-gray-50'>
-            <div className='text-xs text-gray-500'>{t('成本覆盖率')}</div>
-            <div className='font-semibold'>
-              {formatCoverageRate(stat?.cost_coverage_rate || 0)}
-            </div>
-          </div>
-        </div>
-        {stat?.cost_coverage_rate < 1 && (
-          <Text type='tertiary' className='block mb-3'>
-            {t('仅统计已记录上游成本的请求')}
-          </Text>
-        )}
-        <Table
-          size='small'
-          bordered={false}
-          loading={loading}
-          columns={columns}
-          dataSource={stat?.channels || []}
-          rowKey='channel_id'
-          pagination={false}
-          empty={
-            <Empty
-              image={null}
-              description={t('暂无渠道成本数据')}
-              style={{ padding: 24 }}
+            {stat?.cost_coverage_rate < 1 && (
+              <Text type='tertiary' className='block mb-3'>
+                {t('仅统计已记录上游成本的请求')}
+              </Text>
+            )}
+            <Table
+              size='small'
+              bordered={false}
+              loading={loading}
+              columns={columns}
+              dataSource={channels}
+              rowKey='channel_id'
+              pagination={false}
+              empty={
+                <Empty
+                  image={null}
+                  description={t('暂无渠道成本数据')}
+                  style={{ padding: 24 }}
+                />
+              }
             />
-          }
-        />
+          </>
+        )}
       </Card>
     </div>
   );

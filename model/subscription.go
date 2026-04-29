@@ -668,17 +668,21 @@ func GetSubscriptionUsageSummaryByRange(startTimestamp, endTimestamp int64) (Sub
 
 	var subs []UserSubscription
 	err := DB.Select("id, amount_total, start_time, end_time").
-		Where("status = ? AND amount_total > ? AND start_time <= ? AND end_time >= ?", "active", 0, endTimestamp, startTimestamp).
+		Where("amount_total > ? AND start_time <= ? AND end_time >= ?", 0, endTimestamp, startTimestamp).
 		Find(&subs).Error
 	if err != nil {
 		return summary, err
 	}
+	if len(subs) == 0 {
+		return summary, nil
+	}
 
+	subscriptionTotals := make(map[int]int64, len(subs))
 	for _, sub := range subs {
+		subscriptionTotals[sub.Id] = sub.AmountTotal
 		summary.TotalAmount += sub.AmountTotal
 	}
-	summary.SubscriptionCount = int64(len(subs))
-
+	summary.SubscriptionCount = int64(len(subscriptionTotals))
 	if summary.TotalAmount <= 0 {
 		return summary, nil
 	}
@@ -697,6 +701,7 @@ func GetSubscriptionUsageSummaryByRange(startTimestamp, endTimestamp int64) (Sub
 		return summary, err
 	}
 
+	usedBySubscription := make(map[int]int64, len(subscriptionTotals))
 	for _, logItem := range logs {
 		if logItem.Other == "" {
 			continue
@@ -709,16 +714,38 @@ func GetSubscriptionUsageSummaryByRange(startTimestamp, endTimestamp int64) (Sub
 		if billingSource != "subscription" {
 			continue
 		}
-		if consumed, ok := getInt64FromAny(otherMap["subscription_consumed"]); ok {
-			summary.UsedAmount += consumed
+		subscriptionId, ok := getInt64FromAny(otherMap["subscription_id"])
+		if !ok || subscriptionId <= 0 {
 			continue
 		}
-		summary.UsedAmount += int64(logItem.Quota)
+		totalAmount, exists := subscriptionTotals[int(subscriptionId)]
+		if !exists || totalAmount <= 0 {
+			continue
+		}
+		consumed := int64(logItem.Quota)
+		if value, ok := getInt64FromAny(otherMap["subscription_consumed"]); ok {
+			consumed = value
+		}
+		if consumed <= 0 {
+			continue
+		}
+		usedBySubscription[int(subscriptionId)] += consumed
+	}
+
+	for subscriptionId, totalAmount := range subscriptionTotals {
+		used := usedBySubscription[subscriptionId]
+		if used > totalAmount {
+			used = totalAmount
+		}
+		summary.UsedAmount += used
 	}
 
 	summary.Available = true
 	if summary.UsedAmount > 0 {
 		summary.UsageRate = float64(summary.UsedAmount) / float64(summary.TotalAmount)
+		if summary.UsageRate > 1 {
+			summary.UsageRate = 1
+		}
 	}
 	return summary, nil
 }

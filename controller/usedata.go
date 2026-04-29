@@ -14,7 +14,7 @@ func GetDashboardProfitStat(c *gin.Context) {
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
 	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
 	username := c.Query("username")
-	stat, err := model.GetAdminLogProfitStat(model.LogTypeConsume, startTimestamp, endTimestamp, "", username, "", 0, "")
+	stat, err := model.GetAdminLogProfitSummary(startTimestamp, endTimestamp, "", username, "", 0, "")
 	if err != nil {
 		common.ApiError(c, err)
 		return
