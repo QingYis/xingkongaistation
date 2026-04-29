@@ -62,6 +62,8 @@ import SingleModelSelectModal from './SingleModelSelectModal';
 import OllamaModelModal from './OllamaModelModal';
 import CodexOAuthModal from './CodexOAuthModal';
 import ParamOverrideEditorModal from './ParamOverrideEditorModal';
+import ChannelModelCostConfigEditor from './ChannelModelCostConfigEditor';
+import ChannelCostHistorySideSheet from './ChannelCostHistorySideSheet';
 import JSONEditor from '../../../common/ui/JSONEditor';
 import SecureVerificationModal from '../../../common/modals/SecureVerificationModal';
 import StatusCodeRiskGuardModal from './StatusCodeRiskGuardModal';
@@ -366,6 +368,9 @@ const EditChannelModal = (props) => {
   const [codexCredentialRefreshing, setCodexCredentialRefreshing] =
     useState(false);
   const [paramOverrideEditorVisible, setParamOverrideEditorVisible] =
+    useState(false);
+  const [channelCostConfigs, setChannelCostConfigs] = useState([]);
+  const [channelCostHistoryVisible, setChannelCostHistoryVisible] =
     useState(false);
 
   // 密钥显示状态
@@ -907,6 +912,22 @@ const EditChannelModal = (props) => {
           )
             ? parsedSettings.upstream_model_update_ignored_models.join(',')
             : '';
+          data.channel_cost_configs = Object.entries(
+            parsedSettings.upstream_model_cost_configs || {},
+          ).map(([model_name, config]) => ({
+            model_name,
+            enabled: config?.enabled !== false,
+            billing_type: config?.billing_type || 'per_token',
+            input_price: config?.input_price || 0,
+            output_price: config?.output_price || 0,
+            cache_read_price: config?.cache_read_price || 0,
+            cache_write_price: config?.cache_write_price || 0,
+            audio_input_price: config?.audio_input_price || 0,
+            audio_output_price: config?.audio_output_price || 0,
+            image_price: config?.image_price || 0,
+            call_price: config?.call_price || 0,
+            currency: config?.currency || 'USD',
+          }));
         } catch (error) {
           console.error('解析其他设置失败:', error);
           data.azure_responses_version = '';
@@ -925,6 +946,7 @@ const EditChannelModal = (props) => {
           data.upstream_model_update_last_check_time = 0;
           data.upstream_model_update_last_detected_models = [];
           data.upstream_model_update_ignored_models = '';
+          data.channel_cost_configs = [];
         }
       } else {
         // 兼容历史数据：老渠道没有 settings 时，默认按 json 展示
@@ -942,6 +964,7 @@ const EditChannelModal = (props) => {
         data.upstream_model_update_last_check_time = 0;
         data.upstream_model_update_last_detected_models = [];
         data.upstream_model_update_ignored_models = '';
+        data.channel_cost_configs = [];
       }
 
       if (
@@ -954,6 +977,7 @@ const EditChannelModal = (props) => {
 
       initialBaseUrlRef.current = data.base_url || '';
       setInputs(data);
+      setChannelCostConfigs(data.channel_cost_configs || []);
       if (formApiRef.current) {
         formApiRef.current.setValues(data);
       }
@@ -1383,6 +1407,8 @@ const EditChannelModal = (props) => {
     resetKeyDisplayState();
     // 重置剪贴板检测状态
     setClipboardConfig(null);
+    setChannelCostConfigs([]);
+    setChannelCostHistoryVisible(false);
   };
 
   const handleVertexUploadChange = ({ fileList }) => {
@@ -1803,6 +1829,30 @@ const EditChannelModal = (props) => {
       settings.upstream_model_update_last_check_time = 0;
     }
 
+    settings.upstream_model_cost_configs = channelCostConfigs.reduce(
+      (acc, item) => {
+        const modelName = String(item.model_name || '').trim();
+        if (!modelName) {
+          return acc;
+        }
+        acc[modelName] = {
+          enabled: item.enabled !== false,
+          billing_type: item.billing_type || 'per_token',
+          input_price: Number(item.input_price || 0),
+          output_price: Number(item.output_price || 0),
+          cache_read_price: Number(item.cache_read_price || 0),
+          cache_write_price: Number(item.cache_write_price || 0),
+          audio_input_price: Number(item.audio_input_price || 0),
+          audio_output_price: Number(item.audio_output_price || 0),
+          image_price: Number(item.image_price || 0),
+          call_price: Number(item.call_price || 0),
+          currency: item.currency || 'USD',
+        };
+        return acc;
+      },
+      {},
+    );
+
     localInputs.settings = JSON.stringify(settings);
 
     // 清理不需要发送到后端的字段
@@ -1829,6 +1879,7 @@ const EditChannelModal = (props) => {
     delete localInputs.upstream_model_update_last_check_time;
     delete localInputs.upstream_model_update_last_detected_models;
     delete localInputs.upstream_model_update_ignored_models;
+    delete localInputs.channel_cost_configs;
 
     let res;
     localInputs.auto_ban = localInputs.auto_ban ? 1 : 0;
@@ -2128,6 +2179,12 @@ const EditChannelModal = (props) => {
 
   return (
     <>
+      <ChannelCostHistorySideSheet
+        visible={channelCostHistoryVisible}
+        channelId={channelId}
+        onClose={() => setChannelCostHistoryVisible(false)}
+        t={t}
+      />
       <SideSheet
         placement={isEdit ? 'right' : 'left'}
         title={
@@ -2277,8 +2334,32 @@ const EditChannelModal = (props) => {
                 </div>
                 )}
 
+                <div className='py-3 border-b border-gray-100'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <Text className='text-sm font-medium text-gray-500'>
+                      {t('渠道成本')}
+                    </Text>
+                    {isEdit && (
+                      <Button
+                        size='small'
+                        type='tertiary'
+                        onClick={() => setChannelCostHistoryVisible(true)}
+                      >
+                        {t('变更历史')}
+                      </Button>
+                    )}
+                  </div>
+                  <ChannelModelCostConfigEditor
+                    value={channelCostConfigs}
+                    onChange={setChannelCostConfigs}
+                    candidateModelNames={inputs.models || []}
+                    t={t}
+                  />
+                </div>
+
                 {/* Request Config Section */}
                 <div className='py-3 border-b border-gray-100'>
+
                   <Text className='text-sm font-medium text-gray-500 mb-3 block'>
                     {t('请求配置')}
                   </Text>
@@ -3695,7 +3776,7 @@ const EditChannelModal = (props) => {
               <div
                 className='fixed top-0 h-full overflow-y-auto z-[999] semi-sidesheet-inner'
                 style={{
-                  width: 600,
+                  width: 820,
                   [isEdit ? 'right' : 'left']: 600,
                   backgroundColor: 'var(--semi-color-bg-0)',
                   borderLeft: isEdit ? 'none' : '1px solid var(--semi-color-border)',

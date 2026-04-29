@@ -1,16 +1,104 @@
 package service
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 )
+
+func calculateConfiguredUpstreamCostUSD(priceData types.PriceData, promptDetails dto.InputTokenDetails, completionDetails dto.OutputTokenDetails) float64 {
+	if !priceData.UpstreamCostConfigured || priceData.UpstreamCostConfig == nil {
+		return 0
+	}
+	config := priceData.UpstreamCostConfig
+	if !config.Enabled {
+		return 0
+	}
+	if config.BillingType == "per_call" {
+		return config.CallPrice
+	}
+	usdCost := 0.0
+	usdCost += float64(promptDetails.TextTokens) / 1000000 * config.InputPrice
+	usdCost += float64(completionDetails.TextTokens) / 1000000 * config.OutputPrice
+	usdCost += float64(promptDetails.CachedTokens) / 1000000 * config.CacheReadPrice
+	usdCost += float64(promptDetails.CachedCreationTokens) / 1000000 * config.CacheWritePrice
+	usdCost += float64(promptDetails.AudioTokens) / 1000000 * config.AudioInputPrice
+	usdCost += float64(completionDetails.AudioTokens) / 1000000 * config.AudioOutputPrice
+	usdCost += float64(promptDetails.ImageTokens) * config.ImagePrice
+	return usdCost
+}
+
+func resolveUpstreamCostQuota(usage *dto.Usage, priceData *types.PriceData) (int64, string, float64) {
+	if usage != nil && usage.Cost != nil {
+		usdCost, ok := usageCostToFloat64(usage.Cost)
+		if ok && usdCost >= 0 {
+			return int64(usdCost * common.QuotaPerUnit), model.UpstreamCostSourceExact, usdCost
+		}
+	}
+	if usage != nil && priceData != nil {
+		usdCost := calculateConfiguredUpstreamCostUSD(*priceData, usage.PromptTokensDetails, usage.CompletionTokenDetails)
+		if usdCost > 0 {
+			return int64(usdCost * common.QuotaPerUnit), model.UpstreamCostSourceEstimated, usdCost
+		}
+	}
+	return 0, model.UpstreamCostSourceUnknown, 0
+}
+
+func resolveRealtimeUpstreamCostQuota(priceData *types.PriceData, usage *dto.RealtimeUsage) (int64, string, float64) {
+	if priceData == nil || usage == nil {
+		return 0, model.UpstreamCostSourceUnknown, 0
+	}
+	usdCost := calculateConfiguredUpstreamCostUSD(*priceData, usage.InputTokenDetails, usage.OutputTokenDetails)
+	if usdCost > 0 {
+		return int64(usdCost * common.QuotaPerUnit), model.UpstreamCostSourceEstimated, usdCost
+	}
+	return 0, model.UpstreamCostSourceUnknown, 0
+}
+
+func usageCostToFloat64(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int8:
+		return float64(v), true
+	case int16:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case uint:
+		return float64(v), true
+	case uint8:
+		return float64(v), true
+	case uint16:
+		return float64(v), true
+	case uint32:
+		return float64(v), true
+	case uint64:
+		return float64(v), true
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	default:
+		return 0, false
+	}
+}
 
 func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other map[string]interface{}) {
 	if other == nil {
@@ -48,6 +136,10 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	if relayInfo.IsModelMapped {
 		other["is_model_mapped"] = true
 		other["upstream_model_name"] = relayInfo.UpstreamModelName
+	}
+	if relayInfo.PriceData.UpstreamCostConfigured {
+		other["configured_upstream_cost_model"] = relayInfo.PriceData.UpstreamCostModel
+		other["configured_upstream_cost_source"] = relayInfo.PriceData.UpstreamCostSource
 	}
 
 	isSystemPromptOverwritten := common.GetContextKeyBool(ctx, constant.ContextKeySystemPromptOverride)

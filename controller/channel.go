@@ -380,6 +380,34 @@ func GetChannel(c *gin.Context) {
 	return
 }
 
+func GetChannelCostHistory(c *gin.Context) {
+	channelId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if _, err = model.GetChannelById(channelId, false); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo := common.GetPageQuery(c)
+	modelName := strings.TrimSpace(c.Query("model_name"))
+	operatorUsername := strings.TrimSpace(c.Query("operator_username"))
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	page, err := model.GetChannelCostConfigAuditPage(channelId, modelName, operatorUsername, startTimestamp, endTimestamp, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"items":     page.Items,
+		"total":     page.Total,
+		"page":      pageInfo.GetPage(),
+		"page_size": pageInfo.GetPageSize(),
+	})
+}
+
 // GetChannelKey 获取渠道密钥（需要通过安全验证中间件）
 // 此函数依赖 SecureVerificationRequired 中间件，确保用户已通过安全验证
 func GetChannelKey(c *gin.Context) {
@@ -650,11 +678,44 @@ func AddChannel(c *gin.Context) {
 		}
 		channels = append(channels, *localChannel)
 	}
-	err = model.BatchInsertChannels(channels)
-	if err != nil {
+	if len(channels) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "没有可创建的渠道",
+		})
+		return
+	}
+	operatorUserId := c.GetInt("id")
+	operatorUsername := c.GetString("username")
+	tx := model.DB.Begin()
+	if tx.Error != nil {
+		common.ApiError(c, tx.Error)
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	for i := range channels {
+		if err = channels[i].InsertWithTx(tx); err != nil {
+			tx.Rollback()
+			common.ApiError(c, err)
+			return
+		}
+		settings := channels[i].GetOtherSettings()
+		changes := model.DiffChannelModelCostConfigs(nil, settings.UpstreamModelCostConfigs)
+		if err = model.RecordChannelCostConfigAudits(tx, &channels[i], operatorUserId, operatorUsername, changes); err != nil {
+			tx.Rollback()
+			common.ApiError(c, err)
+			return
+		}
+	}
+	if err = tx.Commit().Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	model.InitChannelCache()
 	service.ResetProxyClientCache()
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -953,8 +1014,33 @@ func UpdateChannel(c *gin.Context) {
 			// 覆盖模式：直接使用新密钥（默认行为，不需要特殊处理）
 		}
 	}
-	err = channel.Update()
-	if err != nil {
+
+	beforeSettings := originChannel.GetOtherSettings()
+	afterSettings := channel.GetOtherSettings()
+	changes := model.DiffChannelModelCostConfigs(beforeSettings.UpstreamModelCostConfigs, afterSettings.UpstreamModelCostConfigs)
+	operatorUserId := c.GetInt("id")
+	operatorUsername := c.GetString("username")
+	tx := model.DB.Begin()
+	if tx.Error != nil {
+		common.ApiError(c, tx.Error)
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+	if err = channel.Channel.UpdateWithTx(tx); err != nil {
+		tx.Rollback()
+		common.ApiError(c, err)
+		return
+	}
+	if err = model.RecordChannelCostConfigAudits(tx, &channel.Channel, operatorUserId, operatorUsername, changes); err != nil {
+		tx.Rollback()
+		common.ApiError(c, err)
+		return
+	}
+	if err = tx.Commit().Error; err != nil {
 		common.ApiError(c, err)
 		return
 	}

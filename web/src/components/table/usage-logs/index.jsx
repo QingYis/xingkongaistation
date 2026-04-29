@@ -36,13 +36,11 @@ const LogsPage = () => {
 
   return (
     <>
-      {/* Modals */}
       <ColumnSelectorModal {...logsData} />
       <UserInfoModal {...logsData} />
       <ChannelAffinityUsageCacheModal {...logsData} />
       <ParamOverrideModal {...logsData} />
 
-      {/* Main Content */}
       <CardPro
         type='type2'
         statsArea={<LogsActions {...logsData} />}

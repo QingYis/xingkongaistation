@@ -190,6 +190,8 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 	}
 
 	quota := calculateAudioQuota(quotaInfo)
+	upstreamCostQuota, upstreamCostSource, upstreamCostUSD := resolveRealtimeUpstreamCostQuota(&relayInfo.PriceData, usage)
+	_ = upstreamCostUSD
 
 	totalTokens := usage.TotalTokens
 	var logContent string
@@ -235,6 +237,8 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		IsStream:         relayInfo.IsStream,
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
+		UpstreamCostQuota:  upstreamCostQuota,
+		UpstreamCostSource: upstreamCostSource,
 	})
 }
 
@@ -252,15 +256,15 @@ func CalcOpenRouterCacheCreateTokens(usage dto.Usage, priceData types.PriceData)
 	completionTokens := float64(usage.CompletionTokens)
 	promptCacheReadTokens := float64(usage.PromptTokensDetails.CachedTokens)
 
-	return int(math.Round((cost -
-		totalPromptTokens*quotaPrice +
-		promptCacheReadTokens*(quotaPrice-promptCacheReadPrice) -
-		completionTokens*completionPrice) /
+	return int(math.Round((cost-
+		totalPromptTokens*quotaPrice+
+		promptCacheReadTokens*(quotaPrice-promptCacheReadPrice)-
+		completionTokens*completionPrice)/
 		(promptCacheCreatePrice - quotaPrice)))
 }
 
-func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent string) error {
 
+func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent string) error {
 	useTimeSeconds := time.Now().Unix() - relayInfo.StartTime.Unix()
 	textInputTokens := usage.PromptTokensDetails.TextTokens
 	textOutTokens := usage.CompletionTokenDetails.TextTokens
@@ -277,6 +281,7 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	groupRatio := relayInfo.PriceData.GroupRatioInfo.GroupRatio
 	modelPrice := relayInfo.PriceData.ModelPrice
 	usePrice := relayInfo.PriceData.UsePrice
+	upstreamCostQuota, upstreamCostSource, upstreamCostUSD := resolveUpstreamCostQuota(usage, &relayInfo.PriceData)
 
 	quotaInfo := QuotaInfo{
 		InputDetails: TokenDetails{
@@ -304,14 +309,10 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		logContent = fmt.Sprintf("模型价格 %.2f，分组倍率 %.2f", modelPrice, groupRatio)
 	}
 
-	// record all the consume log even if quota is 0
 	if totalTokens == 0 {
-		// in this case, must be some error happened
-		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
 		logContent += fmt.Sprintf("（可能是上游超时）")
-		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, "+
-			"tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, relayInfo.OriginModelName, relayInfo.FinalPreConsumedQuota))
+		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, relayInfo.OriginModelName, relayInfo.FinalPreConsumedQuota))
 	} else if usage.CompletionTokens == 0 {
 		logContent += fmt.Sprintf("（输出token为0，按系统计价正常扣费）")
 	}
@@ -331,19 +332,26 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 	}
 	other := GenerateAudioOtherInfo(ctx, relayInfo, usage, modelRatio, groupRatio,
 		completionRatio.InexactFloat64(), audioRatio.InexactFloat64(), audioCompletionRatio.InexactFloat64(), modelPrice, relayInfo.PriceData.GroupRatioInfo.GroupSpecialRatio)
+	if upstreamCostSource != model.UpstreamCostSourceUnknown {
+		other["upstream_cost_quota"] = upstreamCostQuota
+		other["upstream_cost_source"] = upstreamCostSource
+		other["upstream_cost_usd"] = upstreamCostUSD
+	}
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
-		ChannelId:        relayInfo.ChannelId,
-		PromptTokens:     usage.PromptTokens,
-		CompletionTokens: usage.CompletionTokens,
-		ModelName:        logModel,
-		TokenName:        tokenName,
-		Quota:            quota,
-		Content:          logContent,
-		TokenId:          relayInfo.TokenId,
-		UseTimeSeconds:   int(useTimeSeconds),
-		IsStream:         relayInfo.IsStream,
-		Group:            relayInfo.UsingGroup,
-		Other:            other,
+		ChannelId:          relayInfo.ChannelId,
+		PromptTokens:       usage.PromptTokens,
+		CompletionTokens:   usage.CompletionTokens,
+		ModelName:          logModel,
+		TokenName:          tokenName,
+		Quota:              quota,
+		Content:            logContent,
+		TokenId:            relayInfo.TokenId,
+		UseTimeSeconds:     int(useTimeSeconds),
+		IsStream:           relayInfo.IsStream,
+		Group:              relayInfo.UsingGroup,
+		Other:              other,
+		UpstreamCostQuota:  upstreamCostQuota,
+		UpstreamCostSource: upstreamCostSource,
 	})
 
 	if relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsEOF() && usage.CompletionTokens == 0 {

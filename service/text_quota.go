@@ -302,6 +302,7 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 
 	adminRejectReason := common.GetContextKeyString(ctx, constant.ContextKeyAdminRejectReason)
 	summary := calculateTextQuotaSummary(ctx, relayInfo, usage)
+	upstreamCostQuota, upstreamCostSource, upstreamCostUSD := resolveUpstreamCostQuota(usage, &relayInfo.PriceData)
 
 	if summary.WebSearchCallCount > 0 {
 		extraContent = append(extraContent, fmt.Sprintf("Web Search 调用 %d 次，调用花费 %s", summary.WebSearchCallCount, decimal.NewFromFloat(summary.WebSearchPrice).Mul(decimal.NewFromInt(int64(summary.WebSearchCallCount))).Div(decimal.NewFromInt(1000)).Mul(decimal.NewFromFloat(summary.GroupRatio)).Mul(decimal.NewFromFloat(common.QuotaPerUnit)).String()))
@@ -363,6 +364,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if adminRejectReason != "" {
 		other["reject_reason"] = adminRejectReason
 	}
+	if upstreamCostSource != model.UpstreamCostSourceUnknown {
+		other["upstream_cost_quota"] = upstreamCostQuota
+		other["upstream_cost_source"] = upstreamCostSource
+		other["upstream_cost_usd"] = upstreamCostUSD
+	}
 	if summary.ImageTokens != 0 {
 		other["image"] = true
 		other["image_ratio"] = summary.ImageRatio
@@ -419,20 +425,22 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	}
 
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
-		ChannelId:        relayInfo.ChannelId,
-		PromptTokens:     summary.PromptTokens,
-		CompletionTokens: summary.CompletionTokens,
-		ModelName:        logModel,
-		TokenName:        summary.TokenName,
-		Quota:            summary.Quota,
-		Content:          logContent,
-		TokenId:          relayInfo.TokenId,
-		UseTimeSeconds:   int(summary.UseTimeSeconds),
-		IsStream:         relayInfo.IsStream,
-		Group:            relayInfo.UsingGroup,
-		Other:            other,
+		ChannelId:          relayInfo.ChannelId,
+		PromptTokens:       summary.PromptTokens,
+		CompletionTokens:   summary.CompletionTokens,
+		ModelName:          logModel,
+		TokenName:          summary.TokenName,
+		Quota:              summary.Quota,
+		Content:            logContent,
+		TokenId:            relayInfo.TokenId,
+		UseTimeSeconds:     int(summary.UseTimeSeconds),
+		IsStream:           relayInfo.IsStream,
+		Group:              relayInfo.UsingGroup,
+		Other:              other,
+		UpstreamCostQuota:  upstreamCostQuota,
+		UpstreamCostSource: upstreamCostSource,
 	})
-	
+
 	// 流式请求以EOF结束（未收到[DONE]终止标记）且输出token为0时，按已有 usage 完成计费后仍返回错误触发重试
 	if relayInfo.StreamStatus != nil && relayInfo.StreamStatus.IsEOF() && summary.CompletionTokens == 0 {
 		logger.LogWarn(ctx, "stream ended with EOF and completion tokens is 0, settled billing with current usage")
@@ -451,6 +459,6 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			types.ErrOptionWithNoRefund(),
 		)
 	}
-	
+
 	return nil
 }

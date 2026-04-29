@@ -37,6 +37,8 @@ import {
   renderClaudeModelPrice,
   renderModelPrice,
   renderTaskBillingProcess,
+  renderQuotaWithAmount,
+  getQuotaWithUnit,
 } from '../../helpers';
 import { ITEMS_PER_PAGE } from '../../constants';
 import { useTableCompactMode } from '../common/useTableCompactMode';
@@ -88,6 +90,12 @@ export const useLogsData = () => {
   const [stat, setStat] = useState({
     quota: 0,
     token: 0,
+    upstream_cost_quota: 0,
+    profit_quota: 0,
+    known_cost_count: 0,
+    total_consume_count: 0,
+    cost_coverage_rate: 0,
+    channels: [],
   });
 
   // Form state
@@ -106,6 +114,12 @@ export const useLogsData = () => {
     ],
     logType: '0',
   };
+
+  const formatQuotaAsUsd = (quota, digits = 2) => {
+    return renderQuotaWithAmount(Number(getQuotaWithUnit(quota, digits)));
+  };
+
+  const formatCoverageRate = (rate) => `${((rate || 0) * 100).toFixed(2)}%`;
 
   // Get default column visibility based on user role
   const getDefaultColumnVisibility = () => {
@@ -278,7 +292,7 @@ export const useLogsData = () => {
     let res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
-      setStat(data);
+      setStat((prev) => ({ ...prev, ...data }));
     } else {
       showError(message);
     }
@@ -303,7 +317,22 @@ export const useLogsData = () => {
     let res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
-      setStat(data);
+      setStat({
+        quota: data.quota || 0,
+        token: data.token || 0,
+        upstream_cost_quota: data.upstream_cost_quota || 0,
+        profit_quota: data.profit_quota || 0,
+        known_cost_count: data.known_cost_count || 0,
+        total_consume_count: data.total_consume_count || 0,
+        cost_coverage_rate: data.cost_coverage_rate || 0,
+        channels: (data.channels || []).map((item) => ({
+          ...item,
+          quota_usd: formatQuotaAsUsd(item.quota || 0),
+          upstream_cost_usd: formatQuotaAsUsd(item.upstream_cost_quota || 0),
+          profit_usd: formatQuotaAsUsd(item.profit_quota || 0),
+          coverage_text: formatCoverageRate(item.cost_coverage_rate || 0),
+        })),
+      });
     } else {
       showError(message);
     }
@@ -888,6 +917,8 @@ export const useLogsData = () => {
     hasExpandableRows,
     setLogType,
     openParamOverrideModal,
+    formatQuotaAsUsd,
+    formatCoverageRate,
 
     // Translation
     t,

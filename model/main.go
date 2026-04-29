@@ -278,6 +278,7 @@ func migrateDB() error {
 		&SubscriptionOrder{},
 		&UserSubscription{},
 		&SubscriptionPreConsumeRecord{},
+		&ChannelCostConfigAudit{},
 		&CustomOAuthProvider{},
 		&UserOAuthBinding{},
 	)

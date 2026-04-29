@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React, { useContext, useEffect } from 'react';
-import { getRelativeTime } from '../../helpers';
+import { getRelativeTime, getQuotaWithUnit, renderQuotaWithAmount } from '../../helpers';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 
@@ -29,6 +29,7 @@ import ApiInfoPanel from './ApiInfoPanel';
 import AnnouncementsPanel from './AnnouncementsPanel';
 import FaqPanel from './FaqPanel';
 import UptimePanel from './UptimePanel';
+import AdminCostProfitPanel from './AdminCostProfitPanel';
 import SearchModal from './modals/SearchModal';
 
 import { useDashboardData } from '../../hooks/dashboard/useDashboardData';
@@ -53,14 +54,11 @@ import {
 } from '../../helpers/dashboard';
 
 const Dashboard = () => {
-  // ========== Context ==========
   const [userState, userDispatch] = useContext(UserContext);
   const [statusState, statusDispatch] = useContext(StatusContext);
 
-  // ========== 主要数据管理 ==========
   const dashboardData = useDashboardData(userState, userDispatch, statusState);
 
-  // ========== 图表管理 ==========
   const dashboardCharts = useDashboardCharts(
     dashboardData.dataExportDefaultTime,
     dashboardData.setTrendData,
@@ -73,7 +71,6 @@ const Dashboard = () => {
     dashboardData.t,
   );
 
-  // ========== 统计数据 ==========
   const { groupedStatsData } = useDashboardStats(
     userState,
     dashboardData.consumeQuota,
@@ -87,7 +84,6 @@ const Dashboard = () => {
     dashboardData.subscriptionUsageSummary,
   );
 
-  // ========== 数据处理 ==========
   const loadUserData = async () => {
     if (dashboardData.isAdminUser) {
       const userData = await dashboardData.loadUserQuotaData();
@@ -103,6 +99,7 @@ const Dashboard = () => {
         dashboardCharts.updateChartData(data);
       }
     });
+    await dashboardData.loadProfitStat();
     await loadUserData();
     await dashboardData.loadUptimeData();
   };
@@ -120,7 +117,6 @@ const Dashboard = () => {
     await loadUserData();
   };
 
-  // ========== 数据准备 ==========
   const apiInfoData = statusState?.status?.api_info || [];
   const announcementData = (statusState?.status?.announcements || []).map(
     (item) => {
@@ -147,7 +143,12 @@ const Dashboard = () => {
     }),
   );
 
-  // ========== Effects ==========
+  const formatQuotaAsUsd = (quota) => {
+    return renderQuotaWithAmount(Number(getQuotaWithUnit(quota, 2)));
+  };
+
+  const formatCoverageRate = (value) => `${((Number(value) || 0) * 100).toFixed(2)}%`;
+
   useEffect(() => {
     initChart();
   }, []);
@@ -184,7 +185,16 @@ const Dashboard = () => {
         CHART_CONFIG={CHART_CONFIG}
       />
 
-      {/* API信息和图表面板 */}
+      <AdminCostProfitPanel
+        visible={dashboardData.isAdminUser}
+        loading={dashboardData.profitStatLoading}
+        stat={dashboardData.profitStat}
+        formatQuotaAsUsd={formatQuotaAsUsd}
+        formatCoverageRate={formatCoverageRate}
+        CARD_PROPS={CARD_PROPS}
+        t={dashboardData.t}
+      />
+
       <div className='mb-4'>
         <div
           className={`grid grid-cols-1 gap-4 ${dashboardData.hasApiInfoPanel ? 'lg:grid-cols-4' : ''}`}
@@ -220,11 +230,9 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* 系统公告和常见问答卡片 */}
       {dashboardData.hasInfoPanels && (
         <div className='mb-4'>
           <div className='grid grid-cols-1 lg:grid-cols-4 gap-4'>
-            {/* 公告卡片 */}
             {dashboardData.announcementsEnabled && (
               <AnnouncementsPanel
                 announcementData={announcementData}
@@ -240,7 +248,6 @@ const Dashboard = () => {
               />
             )}
 
-            {/* 常见问答卡片 */}
             {dashboardData.faqEnabled && (
               <FaqPanel
                 faqData={faqData}
@@ -251,7 +258,6 @@ const Dashboard = () => {
               />
             )}
 
-            {/* 服务可用性卡片 */}
             {dashboardData.uptimeEnabled && (
               <UptimePanel
                 uptimeData={dashboardData.uptimeData}

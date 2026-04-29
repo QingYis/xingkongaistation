@@ -2,6 +2,7 @@ package helper
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -31,6 +32,23 @@ func modelPriceNotConfiguredError(modelName string, userId int) error {
 
 // https://docs.claude.com/en/docs/build-with-claude/prompt-caching#1-hour-cache-duration
 const claudeCacheCreation1hMultiplier = 6 / 3.75
+
+func applyChannelUpstreamCostConfig(info *relaycommon.RelayInfo, priceData *types.PriceData) {
+	if info == nil || priceData == nil || info.ChannelMeta == nil {
+		return
+	}
+	config, ok := info.ChannelOtherSettings.UpstreamModelCostConfigs[info.OriginModelName]
+	if !ok {
+		return
+	}
+	if strings.TrimSpace(config.Currency) == "" {
+		config.Currency = "USD"
+	}
+	priceData.UpstreamCostConfig = &config
+	priceData.UpstreamCostConfigured = true
+	priceData.UpstreamCostModel = info.OriginModelName
+	priceData.UpstreamCostSource = model.UpstreamCostSourceEstimated
+}
 
 // HandleGroupRatio checks for "auto_group" in the context and updates the group ratio and relayInfo.UsingGroup if present
 func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.GroupRatioInfo {
@@ -147,6 +165,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		CacheCreation1hRatio: cacheCreationRatio1h,
 		QuotaToPreConsume:    preConsumedQuota,
 	}
+	applyChannelUpstreamCostConfig(info, &priceData)
 
 	if common.DebugEnabled {
 		println(fmt.Sprintf("model_price_helper result: %s", priceData.ToSetting()))
@@ -213,6 +232,7 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) (types
 		Quota:          quota,
 		GroupRatioInfo: groupRatioInfo,
 	}
+	applyChannelUpstreamCostConfig(info, &priceData)
 	return priceData, nil
 }
 
